@@ -1,11 +1,11 @@
 import {useRef} from "react";
 import {useNavigate} from "react-router-dom";
+import {useCookies} from "react-cookie";
 
 
 
 
-
-function SignUp() {
+function SignUp({setInfoToast}) {
 const fullNameRef = useRef();
 const fullNameErrRef = useRef();
 const userNameRef = useRef();
@@ -17,6 +17,7 @@ const passwordErrRef = useRef();
 const passwordConfirmRef = useRef();
 const passwordConfirmErrRef = useRef();
 const navigate = useNavigate();
+const [cookies] = useCookies(['XSRF-TOKEN']);
 const signUpRequest = (e)=>{
     e.preventDefault();
     const inputNames = ["fullName","userName","email","password","passwordConfirm"];
@@ -43,6 +44,7 @@ const signUpRequest = (e)=>{
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
         },
         body:JSON.stringify(inputNames.reduce((previousValue,currentValue)=>{
             let newField = {};
@@ -86,7 +88,25 @@ const signUpRequest = (e)=>{
 
             } else {
 
-                // navigate("/");
+
+                requestOptions.body = {
+                    token:{
+                        accountEmail:data.account.email,
+                        type:"verifyAccount"
+                    }
+
+                };
+                fetch(import.meta.env.VITE_API_URL+"/token/create",requestOptions)
+                    .then(res=>{
+                        if(res.status === 500){
+                            return Promise.reject(500);
+                        }
+                        setInfoToast("please check your inbox to verify your email");
+                        navigate("/login");
+
+                    })
+                    .catch(err=>console.error(err));
+
             }
         })
 
