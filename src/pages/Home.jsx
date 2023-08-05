@@ -1,4 +1,4 @@
-function Home(){
+function Home({account}){
 
     return (<>
     This is Home

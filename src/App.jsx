@@ -8,9 +8,11 @@ import Redirect from "./pages/Redirect.jsx";
 import './App.css'
 import {useCookies} from "react-cookie";
 import {BrowserRouter, Route, Routes} from "react-router-dom";
+import NewPasswordForm from "./pages/NewPasswordForm.jsx";
+import EmailForm from "./pages/EmailForm.jsx";
 
 function App() {
-    const [user,setUser] = useState({});
+    const [account,setAccount] = useState(null);
     const [successText,setSuccessText] = useState("");
     const [infoText,setInfoText] = useState("");
     const [dangerText,setDangerText] = useState("");
@@ -48,7 +50,7 @@ function App() {
     };
 
     useEffect(()=>{
-        console.log(cookies);
+        console.log("Cookies: ",cookies);
         fetch(import.meta.env.VITE_API_URL+"/account",{
             method:"GET",
             headers:{
@@ -64,14 +66,14 @@ function App() {
 
                 const data = isJson ? await res.json() : null;
                 if(res.status === 200){
-                    setUser(data.account);
+                    setAccount(data.account);
                 }
                 else{
                     return Promise.reject(res.status);
                 }
 
             })
-            .catch(err=>console.err(err));
+            .catch(err=>console.error(err));
 
     },[]);
 
@@ -81,12 +83,14 @@ function App() {
 
         <BrowserRouter>
           <Routes>
-              <Route path={"/"} element={<Home user={user}/>}/>
+              <Route path={"/"} element={<Home account={account}/>}/>
               <Route path={"/signup"} element={<SignUp setInfoToast={setInfoToast} />}/>
-              <Route path={"/login"} element={<Login   setInfoToast={setInfoToast}  />}/>
-              <Route path={"/post/:id"} element={<Post user={user}/>}/>
-              <Route path={"/settings"} element={<Settings user={user}/>}/>
-              <Route path={"/redirect"} element={<Redirect/>}/>
+              <Route path={"/login"} element={<Login setAccount={setAccount} setInfoToast={setInfoToast}  />}/>
+              <Route path={"/post/:id"} element={<Post account={account}/>}/>
+              <Route path={"/settings"} element={<Settings account={account}/>}/>
+              <Route path={"/redirect"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
+              <Route path={"/resetPassword"} element={<NewPasswordForm setSuccessToast={setSuccessToast}/>}/>
+              <Route path={"/forgetPassword"} element={<EmailForm/>}/>
           </Routes>
             <div id="toast-success"
                  className="notification fixed bottom-5 right-5 flex items-center w-full max-w-xs p-4 mb-4 text-gray-500 bg-white rounded-lg shadow dark:text-gray-400 dark:bg-gray-800"
