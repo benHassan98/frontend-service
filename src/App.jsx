@@ -1,18 +1,28 @@
 import { useState, useEffect, useRef } from 'react'
-import SignUp from './pages/SignUp.jsx';
-import Login from './pages/Login.jsx';
-import Home from './pages/Home.jsx';
-import Settings from "./pages/Settings.jsx";
-import Post from "./pages/Post.jsx";
-import Redirect from "./pages/Redirect.jsx";
+import SignUp from './components/SignUp.jsx';
+import Login from './components/Login.jsx';
+import Home from './components/Home.jsx';
+import Settings from "./components/Settings.jsx";
+import Post from "./components/Post.jsx";
+import Redirect from "./components/Redirect.jsx";
+import Navbar from './components/Navbar.jsx';
 import './App.css'
+import 'preline';
 import {useCookies} from "react-cookie";
 import {BrowserRouter, Route, Routes} from "react-router-dom";
-import NewPasswordForm from "./pages/NewPasswordForm.jsx";
-import EmailForm from "./pages/EmailForm.jsx";
-
+import NewPasswordForm from "./components/NewPasswordForm.jsx";
+import EmailForm from "./components/EmailForm.jsx";
+import Test from "./components/Test.jsx";
+import dumb from "./../public/dumb.jpg";
 function App() {
-    const [account,setAccount] = useState(null);
+    const [account,setAccount] = useState({
+        email:'example@gmail.com',
+        fullName:"Ibrahim Al White",
+        userName:"HemaWhite",
+        isVerified:true,
+        image:dumb,
+        aboutMe:"Basically nothing"
+    });
     const [successText,setSuccessText] = useState("");
     const [infoText,setInfoText] = useState("");
     const [dangerText,setDangerText] = useState("");
@@ -49,48 +59,51 @@ function App() {
 
     };
 
-    useEffect(()=>{
-        console.log("Cookies: ",cookies);
-        fetch(import.meta.env.VITE_API_URL+"/account",{
-            method:"GET",
-            headers:{
-                "Content-Type": "application/json",
-                "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
-            },
-            credentials:"include"
-        })
-            .then( async (res)=>{
-                const isJson = res.headers
-                    .get("content-type")
-                    .includes("application/json");
-
-                const data = isJson ? await res.json() : null;
-                if(res.status === 200){
-                    setAccount(data.account);
-                }
-                else{
-                    return Promise.reject(res.status);
-                }
-
-            })
-            .catch(err=>console.error(err));
-
-    },[]);
+    // useEffect(()=>{
+    //     console.log("Cookies: ",cookies);
+    //     fetch(import.meta.env.VITE_API_URL+"/account",{
+    //         method:"GET",
+    //         headers:{
+    //             "Content-Type": "application/json",
+    //             "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
+    //         },
+    //         credentials:"include"
+    //     })
+    //         .then( async (res)=>{
+    //             const isJson = res.headers
+    //                 .get("content-type")
+    //                 .includes("application/json");
+    //
+    //             const data = isJson ? await res.json() : null;
+    //             if(res.status === 200){
+    //                 setAccount(data.account);
+    //             }
+    //             else{
+    //                 return Promise.reject(res.status);
+    //             }
+    //
+    //         })
+    //         .catch(err=>console.error(err));
+    //
+    // },[]);
 
 
 
   return (
 
         <BrowserRouter>
+            <Navbar />
           <Routes>
+
               <Route path={"/"} element={<Home account={account}/>}/>
               <Route path={"/signup"} element={<SignUp setInfoToast={setInfoToast} />}/>
               <Route path={"/login"} element={<Login setAccount={setAccount} setInfoToast={setInfoToast}  />}/>
               <Route path={"/post/:id"} element={<Post account={account}/>}/>
-              <Route path={"/settings"} element={<Settings account={account}/>}/>
+              <Route path={"/settings"} element={<Settings account={account} setSuccessToast={setSuccessToast} setInfoToast={setInfoToast} setDangerToast={setDangerToast} />}/>
               <Route path={"/redirect"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
               <Route path={"/resetPassword"} element={<NewPasswordForm setSuccessToast={setSuccessToast}/>}/>
               <Route path={"/forgetPassword"} element={<EmailForm/>}/>
+              <Route path={"/test"} element={<Test/>}/>
           </Routes>
             <div id="toast-success"
                  className="notification fixed bottom-5 right-5 flex items-center w-full max-w-xs p-4 mb-4 text-gray-500 bg-white rounded-lg shadow dark:text-gray-400 dark:bg-gray-800"

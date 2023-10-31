@@ -15,10 +15,8 @@ function EmailForm(){
                 "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
             },
             body:JSON.stringify({
-                token:{
-                    accountEmail:emailRef.current.value,
-                    type:"resetPassword"
-                }
+                accountEmail:emailRef.current.value,
+                type:"resetPassword"
             }),
             credentials:"include"
 
