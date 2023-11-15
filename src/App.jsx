@@ -14,6 +14,8 @@ import NewPasswordForm from "./components/NewPasswordForm.jsx";
 import EmailForm from "./components/EmailForm.jsx";
 import Test from "./components/Test.jsx";
 import dumb from "./../public/dumb.jpg";
+import PostPage from "./components/PostPage.jsx";
+
 function App() {
     const [account,setAccount] = useState({
         email:'example@gmail.com',
@@ -23,19 +25,32 @@ function App() {
         image:dumb,
         aboutMe:"Basically nothing"
     });
+    const [accessToken, setAccessToken] = useState(null);
+    const [toastText,setToastText] = useState("");
     const [successText,setSuccessText] = useState("");
     const [infoText,setInfoText] = useState("");
     const [dangerText,setDangerText] = useState("");
+    const toastRef = useRef();
     const successRef = useRef();
     const infoRef = useRef();
     const dangerRef = useRef();
     const [cookies] = useCookies(['XSRF-TOKEN']);
+    const fetchAccount = async ()=>{
+        return {};
+    };
 
 
     const toastsClear = ()=>{
+        toastRef.current.classList.remove("notification-transform");
         successRef.current.classList.remove("notification-transform");
         infoRef.current.classList.remove("notification-transform");
         dangerRef.current.classList.remove("notification-transform");
+    };
+
+    const setToast = (text)=>{
+        toastsClear();
+        toastRef.current.classList.add("notification-transform");
+        setToastText(text);
     };
 
     const setSuccessToast = (text)=>{
@@ -98,7 +113,7 @@ function App() {
               <Route path={"/"} element={<Home account={account}/>}/>
               <Route path={"/signup"} element={<SignUp setInfoToast={setInfoToast} />}/>
               <Route path={"/login"} element={<Login setAccount={setAccount} setInfoToast={setInfoToast}  />}/>
-              <Route path={"/post/:id"} element={<Post account={account}/>}/>
+              <Route path={"/post/:id"} element={<PostPage account={account} fetchAccount={fetchAccount} />}/>
               <Route path={"/settings"} element={<Settings account={account} setSuccessToast={setSuccessToast} setInfoToast={setInfoToast} setDangerToast={setDangerToast} />}/>
               <Route path={"/redirect"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
               <Route path={"/resetPassword"} element={<NewPasswordForm setSuccessToast={setSuccessToast}/>}/>
