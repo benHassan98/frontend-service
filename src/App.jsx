@@ -13,7 +13,7 @@ import {BrowserRouter, Route, Routes} from "react-router-dom";
 import NewPasswordForm from "./components/NewPasswordForm.jsx";
 import EmailForm from "./components/EmailForm.jsx";
 import Test from "./components/Test.jsx";
-import dumb from "./../public/dumb.jpg";
+import dumb from "./components/dumb.jpg";
 import PostPage from "./components/PostPage.jsx";
 
 function App() {

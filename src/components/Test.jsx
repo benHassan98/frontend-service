@@ -1,13 +1,21 @@
 import {useEffect, useRef, useState} from "react";
 import sanitizeHtml from "sanitize-html"
-import SockJS from "sockjs-client";
-import {Stomp} from "@stomp/stompjs";
-import dumb from "./../../public/dumb.jpg";
-import qs from 'qs';
+// import SockJS from "sockjs-client";
+// import {Stomp} from "@stomp/stompjs";
+// import qs from 'qs';
 import {useCookies} from "react-cookie";
 import {useNavigate, useResolvedPath, useSearchParams} from "react-router-dom";
 import parse from 'html-react-parser';
-import axios from "axios";
+// import axios from "axios";
+import ReactDOMServer from 'react-dom/server';
+// import ContentEditable from "react-contenteditable";
+// import { Editor } from "react-draft-wysiwyg";
+import {EditorState} from "draft-js";
+import "react-draft-wysiwyg/dist/react-draft-wysiwyg.css";
+import AtomicBlockUtils from "draft-js/lib/AtomicBlockUtils.js";
+import { EditorContent, useEditor} from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Image from '@tiptap/extension-image'
 // function Test(){
 //     const testRef = useRef([]);
 //     const testRefFun = ()=>{
@@ -36,18 +44,66 @@ import axios from "axios";
 //     );
 // }
 function Test(){
+    const extensions = [
+        StarterKit,
+        Image.configure({
+            HTMLAttributes:{
+                class:"w-6 h-6",
+                "is-new":true
+            }
+        }),
 
+    ];
+    const editor = useEditor({
+        extensions,
+        editorProps:{
+            attributes:{
+                class:"overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
+            }
+        },
+        onUpdate:({editor})=>{
+          console.log(editor.getHTML());
+        },
+
+    });
+
+
+    const editorContent = '<p>Hello World!</p>'
     const [content, setContent] = useState("");
     const [filesList, setFilesList] = useState([]);
     const contentEditableRef = useRef();
-    const testRef = useRef();
+    const testRef = useRef("");
     const inputRef = useRef();
     const [stompClient, setStompClient] = useState(null);
     const [, setCookie] = useCookies();
     const [searchParams ,] = useSearchParams();
     const navigate = useNavigate();
+    const [editorState, setEditorState] = useState(EditorState.createEmpty());
+    const handleChange = (e)=>{
+        testRef.current = e.target.value;
+    };
 
+    const addImage = (url)=>{
 
+        const entityKey = editorState // from STATE
+            .getCurrentContent()
+            .createEntity('IMAGE', 'MUTABLE', {
+                src:url,
+                height: '10rem',
+                width: '10rem',
+
+            }).getLastCreatedEntityKey();
+
+        // NEW EDITOR STATE
+        const newEditorState = AtomicBlockUtils.insertAtomicBlock(
+            editorState,
+            entityKey,
+            ' '
+        );
+
+        // SETSTATE
+        setEditorState(newEditorState);
+    }
     const onContentChange = (evt) => {
         setContent(sanitizeHtml(evt.currentTarget.innerHTML));
     };
@@ -133,6 +189,7 @@ function Test(){
 
     return (
         <>
+
         <div
             ref={contentEditableRef}
             contentEditable
@@ -153,21 +210,15 @@ function Test(){
                 type="file"
                 accept="image/*"
                 onChange={(e)=>{
-                    const defaultOptions = {
-                        allowedTags: [ 'img', 'div', 'p' ],
-                        allowedAttributes: {
-                            'a': [ 'href' ],
-                            'img': [  'alt', 'is-new', 'nSrc' ],
-                            'div': ['class', 'id'],
-                            'p': ['class', 'id']
-                        },
-                    };
+
                     const newFile = e.target.files[0];
                     const newFileURL = URL.createObjectURL(newFile);
-                    contentEditableRef.current.innerHTML+=`<img src=${newFileURL} nSrc=1/dumb alt=${newFile.name} />`+`<p class="text-5xl" id="p5">Hello</p>`;
-                    console.log(contentEditableRef.current);
-                    console.log("InnerHTML: ",contentEditableRef.current.innerHTML);
-                    console.log("Sanitize: ",sanitizeHtml(contentEditableRef.current.innerHTML,defaultOptions));
+
+                    editor.chain().focus().setImage({
+                        src:newFileURL,
+                        alt:newFile.name,
+                        class:'w-6 h-6'
+                    }).run();
 
                     setFilesList(prevState => [...prevState,newFile]);
                 }}
@@ -192,16 +243,36 @@ function Test(){
 
     // new File(filesList[0]., "", undefined);
 
-    console.log(testRef.current);
-    const arr = [];
-    testRef.current.childNodes.forEach(node=>{
-        node.lastChild;
-        arr.push({
-            username:node.lastChild.textContent,
-            selected:node.lastChild.classList.contains("selected")
-        });
+
+    const testElement =  parse("<div> <p>Hello</p> <img alt='shit' src='dumb.jpg'/>  <p>World</p>   </div>",{
+        replace(domNode){
+            if(domNode.name === 'img'){
+                domNode.attribs['is-new'] = true;
+                return domNode;
+            }
+        }
     });
-    console.log(arr);
+    const defaultOptions = {
+        allowedTags: [ 'img', 'div' ],
+        allowedAttributes: {
+            'a': [ 'href' ],
+            'img': [  'alt', 'src', 'is-new' ],
+            'div': ['class', 'id'],
+        },
+    };
+    console.log(testElement);
+    console.log(ReactDOMServer.renderToStaticMarkup(testElement));
+    console.log(sanitizeHtml(ReactDOMServer.renderToStaticMarkup(testElement),defaultOptions));
+    // console.log(testRef.current);
+    // const arr = [];
+    // testRef.current.childNodes.forEach(node=>{
+    //     node.lastChild;
+    //     arr.push({
+    //         username:node.lastChild.textContent,
+    //         selected:node.lastChild.classList.contains("selected")
+    //     });
+    // });
+    // console.log(arr);
     // const res =  await fetch("http://localhost:8888/err",{
     //     method:"GET"
     // });
@@ -350,50 +421,26 @@ function Test(){
             >Click</button>
 
 
-            <div className="p-6 space-y-6" ref={testRef}>
-                <div className="flex items-center mb-2">
-                    <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                         src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                         alt="avatar"/>
-                        <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200 transition-colors duration-300 transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md  px-3 py-2"
-                           tabIndex="0" role="link">
-                            Khatab wedaa
 
-                        </a>
-                </div>
-                <div className="flex items-center mb-2">
-                    <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                         src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                         alt="avatar"/>
-                        <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200 transition-colors duration-300 transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md  px-3 py-2 selected"
-                           tabIndex="0" role="link">
-                            Khatab wedaa
+                <EditorContent editor={editor}
+                ></EditorContent>
+            <button onClick={()=>{
 
-                        </a>
-                </div>
-                <div className="flex items-center mb-2">
-                    <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                         src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                         alt="avatar"/>
-                        <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200 transition-colors duration-300 transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md  px-3 py-2"
-                           tabIndex="0" role="link">
-                            Khatab wedaa
+            }}>Add Image</button>
 
-                        </a>
-                </div>
+            {/*<div ref={tiptapRef} className="element overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"></div>*/}
+            {/*<ContentEditable*/}
+            {/*    style={{columns:"4 20rem"}}*/}
+            {/*    html={testRef.current}*/}
+            {/*    onChange={handleChange}*/}
+            {/*    className="overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"/>*/}
 
 
-            </div>
+            {/*<Editor editorStyle={{lineHeight: '75%'}} editorState={editorState} onEditorStateChange={setEditorState}  editorClassName={"overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"}  />*/}
 
-            <button>
-
-
-
-                newInput
-            </button>
-
-
-
+            {/*<button onClick={()=>{*/}
+            {/*    console.log(editorState.getCurrentContent().getAllEntities());*/}
+            {/*}}>convert</button>*/}
         </>
 
     )

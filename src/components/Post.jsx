@@ -9,13 +9,17 @@ import sanitizeHtml from "sanitize-html";
 import SockJS from "sockjs-client";
 import {Stomp} from "@stomp/stompjs";
 import ContentEditable from "react-contenteditable";
+import { EditorContent, useEditor} from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Image from '@tiptap/extension-image'
+import Comment from "./Comment.jsx";
 
 function Post({postProp, id, account, withCommentAccordion = true, fetchAccount, setPostsArr, setToast}){
 
     const [post, setPost] = useState(postProp);
     const [isVisibleToFollowers, setIsVisibleToFollowers] = useState(false);
     const [postContent, setPostContent] = useState("<p>Lorem ipsum dolor sit, amet consectetur adipisicing elit. Tempora expedita dicta</p>");
-    const [newPostContent, setNewPostContent] = useState("");
+    const [editPostContent, setEditPostContent] = useState("");
     const [postAccount, setPostAccount] = useState({});
     const [postArr, setPostArr] = useState([]);
     const [likesArr, setLikesArr] = useState([]);
@@ -30,31 +34,113 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
     const friendsRef = useRef();
 
+    const extensions = [
+        StarterKit,
+        Image.configure({
+            HTMLAttributes:{
+                class:"w-6 h-6",
+                'is-new':true
+            }
+        }),
+
+    ];
+
+
     const {accessToken, setAccessToken} = useContext(AccessTokenContext);
     const [,,removeCookie] = useCookies();
     const navigate = useNavigate();
 
     const [stompClient, setStompClient] = useState(null);
 
-    const [image, setImage] = useState(null);
+
     const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
     const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
     const defaultSanitizeOptions = {
         allowedTags: [ 'img', 'div', 'p' ],
         allowedAttributes: {
-            'a': [ 'href' ],
             'img': [  'src', 'alt', 'class', 'is-new' ],
             'div': ['class', 'id'],
             'p': ['class', 'id']
         },
         allowedSchemesByTag: {'img':['blob','http','https']},
     };
+
+    const commentEditor = useEditor({
+        extensions,
+        editorProps:{
+            attributes:{
+                class:"overflow-y-auto block mt-2 w-full placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4 h-32 py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
+            }
+        },
+        onUpdate:({editor})=>{
+            console.log(editor.getHTML());
+            setCommentContent(sanitizeHtml(editor.getHTML(),defaultSanitizeOptions));
+        },
+
+    });
+    const publicSharedPostEditor = useEditor({
+        extensions,
+        editorProps:{
+            attributes:{
+                class:"overflow-y-auto block mt-2 w-full placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4 h-32 py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
+            }
+        },
+        onUpdate:({editor})=>{
+            console.log(editor.getHTML());
+            setPublicSharedContent(sanitizeHtml(editor.getHTML(),defaultSanitizeOptions));
+        },
+
+    });
+
+    const privateSharedPostEditor = useEditor({
+        extensions,
+        editorProps:{
+            attributes:{
+                class:"overflow-y-auto block mt-2 w-full placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4 h-32 py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
+            }
+        },
+        onUpdate:({editor})=>{
+            console.log(editor.getHTML());
+            setPrivateSharedContent(sanitizeHtml(editor.getHTML(),defaultSanitizeOptions));
+        },
+
+    });
+    const editPostEditor = useEditor({
+        extensions,
+        editorProps:{
+            attributes:{
+                class:"overflow-y-auto block mt-2 w-full placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4 h-32 py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
+            }
+        },
+        onUpdate:({editor})=>{
+            console.log(editor.getHTML());
+            setEditPostContent(sanitizeHtml(editor.getHTML(),defaultSanitizeOptions));
+
+        },
+
+    });
+
     // const blobClient = containerClient.getBlobClient("dumb.jpg");
     // blobClient.download()
     //     .then(blob=>blob.blobBody)
     //     .then(blobBody=>{
     //         setImage(URL.createObjectURL(blobBody));
     //     });
+
+    const isImageExists = (id, content)=>{
+        let exists = false;
+
+        parse(content,{
+            replace(domNode){
+                exists |= (domNode.attribs.src.includes(id));
+                return domNode;
+            }
+        });
+
+
+        return exists;
+    };
+
     const deletePostRequest = ()=>{
         fetch(import.meta.env.VITE_POST_SERVICE+"/"+post.id,{
             method:"DELETE",
@@ -108,7 +194,10 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
             .catch(err=>console.error(err));
 
     };
-    const updatePostRequest = ()=>{
+    const updatePostRequest = (e)=>{
+
+        if(e){e.preventDefault();}
+
         let html = sanitizeHtml(postContent, defaultSanitizeOptions);
         const urlToSrc = postArr[0].currPost.urlToSrc;
 
@@ -116,11 +205,14 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
             html = html.replace(k,v);
         }
 
+        const imageList = updatePostImageList.filter(image=>isImageExists(image.id,html)).map(image=>image.file);
+
+
         let formData = new FormData();
         formData.append("post",{
             ...post,
             content:html,
-            imageList:updatePostImageList
+            imageList
         });
 
         fetch(import.meta.env.VITE_POST_SERVICE+"/update",{
@@ -197,9 +289,11 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
         const friendsVisibilityType = isPublic? false : (selectedCnt<friendsArr.length);
         const visibleToFriendList = friendsArr.filter(friend=>friend.isSelected===friendsVisibilityType).map(friend=>friend.id);
         const content = isPublic?
-            sanitizeHtml(publicSharedContentRef.current.innerHTML,defaultSanitizeOptions):
+            sanitizeHtml(publicSharedContent,defaultSanitizeOptions):
             sanitizeHtml(privateSharedContent,defaultSanitizeOptions)
-        const imageList = isPublic?publicSharedPostImageList:privateSharedPostImageList;
+        let imageList = isPublic?publicSharedPostImageList:privateSharedPostImageList;
+        imageList = imageList.filter(image=>isImageExists(image.id,content)).map(image=>image.file);
+
 
         let formData = new FormData();
         formData.append("post",{
@@ -257,7 +351,9 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
             .catch(err=>console.error(err));
 
     };
-    const newCommentRequest = ()=>{
+    const newCommentRequest = (e)=>{
+
+        if(e){e.preventDefault();}
 
         const content = sanitizeHtml(commentContent,defaultSanitizeOptions);
 
@@ -266,7 +362,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
             accountId:account.id,
             post,
             content,
-            imageList:newCommentImageList
+            imageList:newCommentImageList.filter(image=>isImageExists(image.id,content)).map(image=>image.file)
         });
 
         fetch(import.meta.env.VITE_POST_SERVICE+'/comment/create',{
@@ -352,18 +448,19 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
               const imagesNameArr = [];
               const urlToSrc = {};
-              const srcToUrl = {};
+
 
 
               parse(currPost.content,{
                  replace(domNode){
                      if (domNode.name === "img") {
-                         imagesNameArr.push(domNode.attribs.nSrc);
+                         imagesNameArr.push(domNode.attribs.src);
                          return domNode;
                      }
                  }
              });
 
+             let newContent = currPost.content;
 
              for(let elem of imagesNameArr){
 
@@ -373,7 +470,8 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                  const elemURL = URL.createObjectURL(elemBlobBody);
 
                  urlToSrc[elemURL] = elem;
-                 srcToUrl[elem] = elemURL;
+
+                 newContent = newContent.replace(elem, elemURL);
              }
 
              if(!postContentArr.length){
@@ -381,13 +479,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
              }
 
-             currPost.content = parse(currPost.content,{
-                 replace(domNode){
-                     if(domNode.name === 'img'){
-                         return <img src={srcToUrl[domNode.attribs.nSrc]} alt={domNode.attribs.alt} />;
-                     }
-                 }
-             });
+             currPost.content = newContent;
 
 
 
@@ -425,6 +517,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
 
                     setPost(data);
+                    editPostEditor.commands.setContent(tempPostsArr[0].currPost.content);
                     setPostArr([...tempPostsArr]);
                     setLikesArr([...data.likesList]);
                     setCommentsArr([...data.commentsList]);
@@ -541,14 +634,8 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                             className="p-1 mx-auto rounded-md bg-gray-800"
                                         >
 
-                                            <ContentEditable
-                                                      html={newPostContent}
-                                                      onChange={e=>{
-                                                          setNewPostContent(sanitizeHtml(e.target.value, defaultSanitizeOptions));
-                                                      }}
-                                                      className="block mt-2 w-full placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4 h-20 py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
-                                                      style={{resize:"none"}}
-                                            />
+
+                                            <EditorContent editor={editPostEditor}></EditorContent>
 
                                             <div className="flex justify-end mt-2 gap-1">
                                                 <label
@@ -563,9 +650,18 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                 <input  id={"postEditImageInput"} className={"hidden"} type="file" accept="image/*"
                                                         onChange={(e)=>{
                                                             const newImage = e.target.files[0];
-                                                            setUpdatePostImageList((prevState)=>[...prevState, newImage]);
-                                                            setNewPostContent(prevState => prevState+`<img src=${URL.createObjectURL(newImage)} alt=${newImage.name} class="w-20 h-20" />`);
+                                                            const newImageUrl = URL.createObjectURL(newImage);
 
+                                                            editPostEditor.chain().focus().setImage({
+                                                                src:newImageUrl,
+                                                                alt:newImage.name
+                                                            })
+                                                                .run();
+
+                                                            setUpdatePostImageList((prevState)=>[...prevState, {
+                                                                id:newImageUrl,
+                                                                file:newImage
+                                                            }]);
 
                                                         }}
                                                 />
@@ -772,15 +868,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                             <form
                                                 className="p-1 mx-auto rounded-md bg-gray-800"
                                             >
-
-                                                <ContentEditable
-                                                          html={publicSharedContent}
-                                                          onChange={e=>{
-                                                          setPublicSharedContent(sanitizeHtml(e.target.value, defaultSanitizeOptions));
-                                                          }}
-                                                          className="block mt-2 w-full placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4 h-20 py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
-                                                          style={{resize:"none"}}
-                                                />
+                                                <EditorContent editor={publicSharedPostEditor}></EditorContent>
 
                                                 <div className="flex justify-end mt-2 gap-1">
                                                     <label
@@ -795,9 +883,16 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                     <input  id={"publicShareInput"} className={"hidden"} type="file" accept="image/*"
                                                             onChange={(e)=>{
                                                                 const newImage = e.target.files[0];
-                                                                setPublicSharedPostImageList((prevState)=>[...prevState, newImage]);
-                                                                setPublicSharedContent(prevState => prevState+`<img src=${URL.createObjectURL(newImage)} alt=${newImage.name} class="w-20 h-20" />`);
-
+                                                                const newImageUrl = URL.createObjectURL(newImage);
+                                                                publicSharedPostEditor.chain().focus().setImage({
+                                                                    src:newImageUrl,
+                                                                    alt:newImage.name
+                                                                })
+                                                                    .run();
+                                                                setPublicSharedPostImageList((prevState)=>[...prevState, {
+                                                                    id:newImageUrl,
+                                                                    file:newImage
+                                                                }]);
                                                             }}
                                                     />
                                                     <button
@@ -866,17 +961,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                             <form
                                                 className="p-1 mx-auto rounded-md bg-gray-800"
                                             >
-
-                                                <ContentEditable
-
-                                                          html={privateSharedContent}
-                                                          onChange={(e)=>{
-                                                              setPrivateSharedContent(sanitizeHtml(e.target.value, defaultSanitizeOptions));
-
-                                                          }}
-                                                          className="block mt-2 w-full placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4 h-20 py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
-                                                          style={{resize:"none"}}
-                                                />
+                                                <EditorContent editor={privateSharedPostEditor}></EditorContent>
 
                                                 <div className="flex justify-end mt-2 gap-1">
                                                     <label
@@ -891,9 +976,16 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                     <input  id={"privateShareInput"} className={"hidden"} type="file" accept="image/*"
                                                             onChange={(e)=>{
                                                                 const newImage = e.target.files[0];
-                                                                setPrivateSharedPostImageList((prevState)=>[...prevState, newImage]);
-                                                                setPrivateSharedContent(prevState => prevState+`<img src=${URL.createObjectURL(newImage)} alt=${newImage.name} class="w-20 h-20" />`);
+                                                                const newImageUrl = URL.createObjectURL(newImage);
+                                                                privateSharedPostEditor.chain().focus().setImage({
+                                                                    src:newImageUrl,
+                                                                    alt:newImage.name
+                                                                }).run();
 
+                                                                setPrivateSharedPostImageList((prevState)=>[...prevState, {
+                                                                    id:newImageUrl,
+                                                                    file:newImage
+                                                                }]);
                                                             }}
                                                     />
                                                     <button
@@ -1096,13 +1188,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
                     <form className="p-1 mx-auto rounded-md bg-gray-800">
 
-                        <ContentEditable
-                                  html={commentContent}
-                                  onChange={(e)=>{
-                                      setCommentContent(sanitizeHtml(e.target.value,defaultSanitizeOptions));
-                                  }}
-                                  className="block mt-2 w-full placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4 h-32 py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
-                                  style={{resize:"none"}}/>
+                        <EditorContent editor={commentEditor}></EditorContent>
 
                         <div className="flex justify-end mt-2 gap-1">
                             <label
@@ -1117,8 +1203,16 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                             <input  id={"commentImageInput"} className={"hidden"} type="file" accept="image/*"
                             onChange={(e)=>{
                                 const newImage = e.target.files[0];
-                                setCommentContent(prevState => prevState+`<img src=${URL.createObjectURL(newImage)} alt=${newImage.name} class="w-20 h-20" />`);
-                                setNewCommentImageList((prevState)=>[...prevState, newImage])
+                                const newImageUrl = URL.createObjectURL(newImage);
+                                commentEditor.chain().focus().setImage({
+                                    src:newImageUrl,
+                                    alt:newImage.name
+                                })
+                                    .run();
+                                setNewCommentImageList((prevState)=>[...prevState, {
+                                    id:newImageUrl,
+                                    file:newImage
+                                }])
 
                             }
 
