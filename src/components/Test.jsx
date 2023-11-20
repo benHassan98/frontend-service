@@ -50,7 +50,7 @@ function Test(){
         StarterKit,
         Image.configure({
             HTMLAttributes:{
-                class:"w-6 h-6",
+                class:"w-32 h-32",
                 "is-new":true
             }
         }),
@@ -60,7 +60,7 @@ function Test(){
         extensions,
         editorProps:{
             attributes:{
-                class:"overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
+                class:"overflow-y-auto  block  mt-2 w-[20rem] h-[20rem]  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"
             }
         },
         onUpdate:({editor})=>{
@@ -76,13 +76,14 @@ function Test(){
     const [content, setContent] = useState("");
     const [filesList, setFilesList] = useState([]);
     const contentEditableRef = useRef();
-    const testRef = useRef("");
+    const testRef = useRef("asdsadasdasdasdasdasdadsad<br>asdasdawdasdashbbawdyawdbawd<br> asdasdasdadawdasdawd");
     const inputRef = useRef();
     const [stompClient, setStompClient] = useState(null);
     const [, setCookie] = useCookies();
     const [searchParams ,] = useSearchParams();
     const navigate = useNavigate();
     const [editorState, setEditorState] = useState(EditorState.createEmpty());
+    const [testState, setTestState] = useState();
     const handleChange = (e)=>{
         testRef.current = e.target.value;
     };
@@ -240,10 +241,10 @@ function Test(){
                     editor.chain().focus().setImage({
                         src:newFileURL,
                         alt:newFile.name,
-                        class:'w-6 h-6'
                     }).run();
 
                     setFilesList(prevState => [...prevState,newFile]);
+                    testRef.current = `<img src=${newFileURL} alt=${newFile.name} class="w-14 h-14" />`;
                 }}
             />
 
@@ -369,6 +370,25 @@ function Test(){
 </button>
             <button
             onClick={()=>{
+                const x = parse("<p>Helyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy</p><br/> <p>BOMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM</p>");
+                setTestState(x);
+
+                   // console.log(import.meta.env.VITE_ACCOUNT_SERVICE+"/10");
+                   // fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/10",{
+                   //  method:"GET",
+                   //  headers:{
+                   //      "Content-Type": "application/json",
+                   //      "Authorization": `Bearer  `
+                   //  },
+                   //  credentials:"include"
+                   //
+                   // })
+                   // .then(async(res)=>{
+                   //
+                   //  const data = await res.json();
+                   //  console.log(data);
+                   // });
+
 
                 // stompClient.send("/like",
                 //     {},
@@ -389,27 +409,24 @@ function Test(){
                 //         console.log(res);
                 //     });
                 //
-                const form = new FormData();
+                // const form = new FormData();
+                
+                // form.append('id','1');
                 // form.append("file",filesList[0]);
-                //
-                // form.append("id","1");
 
-                form.append('id','1');
-                form.append("file",filesList[0]);
+                // form.append("imageList",filesList[0]);
+                // form.append("imageList",filesList[0]);
 
-                form.append("imageList",filesList[0]);
-                form.append("imageList",filesList[0]);
+                // form.append("idList","1");
+                // form.append("idList","2");
 
-                form.append("idList","1");
-                form.append("idList","2");
-
-                axios({
-                    method: 'post',
-                    url: import.meta.env.VITE_POST_SERVICE+"/test/test",
-                    data: form,
-                    headers: {'Content-Type': 'multipart/form-data' }
-                })
-                    .then(res=>console.log(res.status));
+                // axios({
+                //     method: 'post',
+                //     url: import.meta.env.VITE_POST_SERVICE+"/test/test",
+                //     data: form,
+                //     headers: {'Content-Type': 'multipart/form-data' }
+                // })
+                //     .then(res=>console.log(res.status));
                 // form.append("testOb",{
                 //    id:1,
                 //    file:filesList[0]
@@ -478,18 +495,21 @@ function Test(){
 
 
 
-                <EditorContent editor={editor}
+                <EditorContent editor={editor} disabled={true}
                 ></EditorContent>
+            <div >
+                {testState}
+            </div>
             <button onClick={()=>{
 
             }}>Add Image</button>
 
             {/*<div ref={tiptapRef} className="element overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"></div>*/}
-            <ContentEditable
-                style={{columns:"4 20rem"}}
-                html={testRef.current}
-                onChange={handleChange}
-                className="overflow-y-auto  block  mt-2 max-w-sm h-[30rem]  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"/>
+            {/*<ContentEditable*/}
+            {/*    html={testRef.current}*/}
+            {/*    disabled={true}*/}
+            {/*    onChange={handleChange}*/}
+            {/*    className="overflow-y-auto  block  mt-2  w-12 h-12  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"/>*/}
 
 
             {/*<Editor editorStyle={{lineHeight: '75%'}} editorState={editorState} onEditorStateChange={setEditorState}  editorClassName={"overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"}  />*/}

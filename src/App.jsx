@@ -17,7 +17,7 @@ import {BlobServiceClient} from "@azure/storage-blob";
 
 function App() {
     const [account,setAccount] = useState({});
-    const [accessToken, setAccessToken] = useState(null);
+    const [accessToken, setAccessToken] = useState("");
     const [toastText,setToastText] = useState("");
     const [successText,setSuccessText] = useState("");
     const [infoText,setInfoText] = useState("");
@@ -36,7 +36,7 @@ function App() {
 
 
         try{
-            const res = await fetch(import.meta.env.VITE_ACCOUNT_SERVICE+'/account/'+id,{
+            const res = await fetch(import.meta.env.VITE_ACCOUNT_SERVICE+'/'+id,{
                 method:"GET",
                 headers:{
                     "Content-Type": "application/json",
@@ -52,6 +52,18 @@ function App() {
                 const blobBody = await blob.blobBody;
 
                 accountRes.picture = URL.createObjectURL(blobBody);
+
+                for(let i = 0; i< accountRes.friendList.length;i++){
+                    const friend = accountRes.friendList[i];
+
+                    const friendBlobClient = containerClient.getBlobClient(friend.picture);
+                    const friendBlob = await friendBlobClient.download();
+                    const friendBlobBody = await friendBlob.blobBody;
+
+
+                    accountRes.friendList[i].picture = URL.createObjectURL(friendBlobBody);
+
+                }
 
                 return accountRes;
             }
@@ -86,10 +98,6 @@ function App() {
             console.error(e);
 
         }
-
-
-
-        // return fetch(import.meta.env.VITE_ACCOUNT_SERVICE+'/account/'+id);
 
     };
 
@@ -130,25 +138,16 @@ function App() {
 
     useEffect(()=>{
          fetchAccount(10)
-             .then(async (res)=>{
-                 const friendList = [];
-
-                 for(let i = 0;i<res.friendList.length;i++){
-
-                     const friend = await fetchAccount(res.friendList[i]);
-                     friendList.push(friend);
-
-                 }
+             .then( (res)=>{
 
                  setAccount({
-                     ...res,
-                     friendList
+                     ...res
                  });
 
              })
              .catch(err=>console.error(err));
 
-    });
+    },[]);
     // useEffect(()=>{
     //     console.log("Cookies: ",cookies);
     //     fetch(import.meta.env.VITE_API_URL+"/account",{

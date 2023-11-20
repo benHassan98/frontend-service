@@ -40,7 +40,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
         Image.configure({
 
             HTMLAttributes:{
-                class:"w-15 h-15",
+                class:"w-32 h-32",
 
             }
         }),
@@ -121,13 +121,6 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
         },
 
     });
-
-    // const blobClient = containerClient.getBlobClient("dumb.jpg");
-    // blobClient.download()
-    //     .then(blob=>blob.blobBody)
-    //     .then(blobBody=>{
-    //         setImage(URL.createObjectURL(blobBody));
-    //     });
 
     const isImageExists = (url, content)=>{
         let exists = false;
@@ -262,13 +255,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
         }).then( async (res)=>{
                 if(res.status === 200){
                     const data =  res.data;
-                    const tempPostsArr = await extractPostContent(data);
-
-                    setPost(data);
-                    setEditPostContent(tempPostsArr[0].currPost.content);
-                    setPostArr([...tempPostsArr]);
-                    setLikesArr([...data.likesList]);
-                    setCommentsArr([...data.commentsList]);
+                    setPostStates(data);
 
                 }
                 else if(res.status === 401){
@@ -558,24 +545,29 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
     const setPostStates = async (data)=>{
 
         const tempPostsArr = await extractPostContent(data);
+        const tempLikesArr = [];
 
         const dataAccount = await fetchAccount(data.accountId);
 
         console.log("postArr: ",tempPostsArr);
 
+        for(let i = 0; i<data.likesList.length;i++){
+            const likeAccount = await fetchAccount(data.likesList[i]);
 
+            tempLikesArr.push(likeAccount);
+        }
 
         setPost({...data});
         setPostAccount({...dataAccount});
         setPostContent(tempPostsArr[0].currPost.content);
         setEditPostContent(tempPostsArr[0].currPost.content);
         setPostArr([...tempPostsArr]);
-        setLikesArr([...data.likesList]);
+        setLikesArr([...tempLikesArr]);
         setCommentsArr([...data.commentsList]);
     };
     const fetchPost = ()=>{
 
-        fetch(import.meta.env.VITE_POST_SERVICE+"/9",{
+        fetch(import.meta.env.VITE_POST_SERVICE+"/"+id,{
             method:"GET",
             headers:{
                 "Content-Type": "application/json",
@@ -714,7 +706,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                     <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link">{postAccount.userName}</a>
                     <span
                         className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">
-                        shared {Boolean(post.sharedFromPost) && <TimeAgo date={post.createdDate}/>}
+                        {post.sharedFromPost?"shared":"posted"} {Boolean(post.createdDate) && <TimeAgo date={Date.parse(post.createdDate)}/>}
                     </span>
                     <span className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">{post.isEdited && "Edited"}</span>
 
@@ -736,6 +728,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                     </div>
 
                     <div
+                        onClick={(e)=>deletePostRequest(e)}
                         className="hover:bg-black rounded-full transition-colors duration-300 transform w-8 h-8 flex items-center justify-center cursor-pointer">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-6 h-6"
                              style={{color:"#9ca3af"}}>
@@ -796,7 +789,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                                     editPostEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} />`
                                                                 );
 
-                                                            setEditPostContent((prevState)=>prevState+`<img src=${newImageUrl} alt=${newImage.name} class="w-15 h-15" />`);
+                                                            setEditPostContent((prevState)=>prevState+`<img src=${newImageUrl} alt=${newImage.name} class="w-32 h-32" />`);
 
                                                             setUpdatePostImageList((prevState)=>[...prevState, {
                                                                 id:newImageId,
@@ -841,33 +834,51 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                 disabled={true}
             />
 
+            {
+                postArr.filter((val,i)=>i>0).map((currVal)=>{
 
-            <div className="flex items-center justify-between my-4">
-                <span className="w-1/5 border-b dark:border-gray-600 lg:w-1/5"></span>
 
-                <p className="text-xs text-center text-gray-500 uppercase dark:text-gray-400">
-                    Shared From
-                </p>
 
-                <span className="w-1/5 border-b dark:border-gray-600 lg:w-1/5"></span>
-            </div>
+                    return(
+                        <>
+                        <div  className="flex items-center justify-between my-4">
+                            <span className="w-1/5 border-b dark:border-gray-600 lg:w-1/5"></span>
 
-            <div className="flex justify-between">
+                            <p className="text-xs text-center text-gray-500 uppercase dark:text-gray-400">
+                                Shared From
+                            </p>
 
-                <div className="flex items-center">
-                    <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                         src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                         alt="avatar"/>
-                        <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0"
-                           role="link">Khatab wedaa</a>
-                        <span className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2"> posted today at 2:04 PM</span>
+                            <span className="w-1/5 border-b dark:border-gray-600 lg:w-1/5"></span>
+                        </div>
 
-                </div>
+                            <div className="flex justify-between">
 
-            </div>
-            <p className="mt-2 text-gray-600 dark:text-gray-300">Lorem ipsum dolor sit, amet consectetur adipisicing
-                elit. Tempora expedita dicta totam aspernatur doloremque. Excepturi iste iusto eos enim reprehenderit
-                nisi, accusamus delectus nihil quis facere in modi ratione libero!</p>
+                                <div className="flex items-center">
+                                    <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
+                                         src={currVal.postAccount.picture}
+                                         alt="avatar"/>
+                                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0"
+                                       role="link">{currVal.postAccount.userName}</a>
+                                    <span
+                                        className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">
+                        {currVal.isShared?"shared":"posted"} {Boolean(currVal.currPost.createdDate) && <TimeAgo date={Date.parse(currVal.currPost.createdDate)}/>}
+                    </span>
+                                    <span className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">{currVal.isEdited && "Edited"}</span>
+
+                                </div>
+
+                            </div>
+                            <ContentEditable
+                                className={"mt-2 text-gray-300"}
+                                html={currVal.currPost.content}
+                                onChange={()=>{}}
+                                disabled={true}
+                            />
+                        </>
+
+                    );
+                })
+            }
 
             <hr className="border-gray-200 dark:border-gray-700 mt-4"/>
 
@@ -875,8 +886,8 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                 <div className="flex mt-2 items-center justify-between mb-2 hs-accordion-group">
 
 
-                    <p className="text-white" data-hs-overlay="#hs-slide-down-animation-modal">
-                        5 Likes
+                    <p className="cursor-pointer text-white" data-hs-overlay={Boolean(likesArr.length) && "#hs-slide-down-animation-modal"}>
+                        {likesArr.length>0?likesArr.length>1?`${likesArr.length} Likes`:`${likesArr.length} Like`:"No Likes"}
                     </p>
 
                     <div id="hs-slide-down-animation-modal"
@@ -904,37 +915,23 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                 </div>
                                 <div className="p-4 overflow-y-auto">
                                     <div className="p-6 space-y-6">
-                                        <div className="flex items-center mb-2">
-                                            <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                                                 src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                                 alt="avatar"/>
-                                                <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200 transition-colors duration-300 transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md  px-3 py-2"
-                                                   tabIndex="0" role="link">
-                                                    Khatab wedaa
+                                        {
+                                            likesArr.map((likeAccount, i)=>{
 
-                                                </a>
-                                        </div>
-                                        <div className="flex items-center mb-2">
-                                            <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                                                 src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                                 alt="avatar"/>
-                                                <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200 transition-colors duration-300 transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md  px-3 py-2"
-                                                   tabIndex="0" role="link">
-                                                    Khatab wedaa
+                                                return(
+                                                    <div key={i} className="flex items-center mb-2">
+                                                        <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
+                                                             src={likeAccount.picture}
+                                                             alt="avatar"/>
+                                                        <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200 transition-colors duration-300 transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md  px-3 py-2"
+                                                           tabIndex="0" role="link">
+                                                            {likeAccount.userName}
+                                                        </a>
+                                                    </div>
+                                                );
 
-                                                </a>
-                                        </div>
-                                        <div className="flex items-center mb-2">
-                                            <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                                                 src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                                 alt="avatar"/>
-                                                <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200 transition-colors duration-300 transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md  px-3 py-2"
-                                                   tabIndex="0" role="link">
-                                                    Khatab wedaa
-
-                                                </a>
-                                        </div>
-
+                                            })
+                                        }
 
                                     </div>
                                 </div>
@@ -944,8 +941,8 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                     </div>
 
 
-                    <p className={(withCommentAccordion&&"hs-accordion-toggle")+" text-white"}>
-                        10 Comments
+                    <p className={(withCommentAccordion&&"hs-accordion-toggle cursor-pointer")+"  text-white"}>
+                        {commentsArr.length>0?commentsArr.length>1?`${commentsArr.length} Comments`:`${commentsArr.length} Comment`:"No Comments"}
                     </p>
 
 
@@ -1036,7 +1033,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
                                                                 publicSharedPostEditor.commands
                                                                     .setContent(
-                                                                        publicSharedPostEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} class="w-15 h-15" />`
+                                                                        publicSharedPostEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} class="w-32 h-32" />`
                                                                     );
                                                                 setPublicSharedPostImageList((prevState)=>[...prevState, {
                                                                     id:newImageId,
@@ -1132,7 +1129,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
                                                                 privateSharedPostEditor.commands
                                                                     .setContent(
-                                                                        privateSharedPostEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} class="w-15 h-15" />`
+                                                                        privateSharedPostEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} class="w-32 h-32" />`
                                                                     );
 
                                                                 setPrivateSharedPostImageList((prevState)=>[...prevState, {
@@ -1156,7 +1153,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
                                                 {
                                                     account.friendList?.map((friend, i)=>{
-
+                                                        console.log("friend: ",friend);
                                                         return(
                                                             <div
                                                                 key={i}
@@ -1261,77 +1258,6 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
                 <div className={"overflow-hidden transition-[height] duration-300"+(withCommentAccordion?"hidden hs-accordion-content":"")}>
 
-                    <div className="rounded-lg bg-gray-700 py-4 px-4 mb-2">
-
-                        <div className="flex justify-between">
-
-                            <div className="flex items-center">
-                                <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                                     src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                     alt="avatar"/>
-                                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
-                                       tabIndex="0" role="link">Khatab wedaa</a>
-                                    <span className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2"> posted today at 2:04 PM</span>
-
-                            </div>
-
-
-                        </div>
-                        <p className="mt-2 text-gray-600 dark:text-gray-300">Lorem ipsum dolor sit, amet consectetur
-                            adipisicing elit. Tempora expedita dicta totam aspernatur doloremque. Excepturi iste iusto
-                            eos enim reprehenderit nisi, accusamus delectus nihil quis facere in modi ratione
-                            libero!</p>
-
-
-                    </div>
-
-                    <div className="rounded-lg bg-gray-700 py-4 px-4 mb-2">
-
-                        <div className="flex justify-between">
-
-                            <div className="flex items-center">
-                                <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                                     src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                     alt="avatar"/>
-                                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
-                                       tabIndex="0" role="link">Khatab wedaa</a>
-                                    <span className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2"> posted today at 2:04 PM</span>
-
-                            </div>
-
-
-                        </div>
-                        <p className="mt-2 text-gray-600 dark:text-gray-300">Lorem ipsum dolor sit, amet consectetur
-                            adipisicing elit. Tempora expedita dicta totam aspernatur doloremque. Excepturi iste iusto
-                            eos enim reprehenderit nisi, accusamus delectus nihil quis facere in modi ratione
-                            libero!</p>
-
-
-                    </div>
-
-                    <div className="rounded-lg bg-gray-700 py-4 px-4 mb-2">
-
-                        <div className="flex justify-between">
-
-                            <div className="flex items-center">
-                                <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                                     src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                     alt="avatar"/>
-                                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
-                                       tabIndex="0" role="link">Khatab wedaa</a>
-                                    <span className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2"> posted today at 2:04 PM</span>
-
-                            </div>
-
-
-                        </div>
-                        <p className="mt-2 text-gray-600 dark:text-gray-300">Lorem ipsum dolor sit, amet consectetur
-                            adipisicing elit. Tempora expedita dicta totam aspernatur doloremque. Excepturi iste iusto
-                            eos enim reprehenderit nisi, accusamus delectus nihil quis facere in modi ratione
-                            libero!</p>
-
-
-                    </div>
                     {
                         commentsArr.map((comment, i)=>{
                             return (
@@ -1363,7 +1289,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
                                 commentEditor.commands
                                     .setContent(
-                                        commentEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} class="w-15 h-15" />`
+                                        commentEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} class="w-32 h-32" />`
                                     );
 
                                 setNewCommentImageList((prevState)=>[...prevState, {

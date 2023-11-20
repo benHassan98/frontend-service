@@ -117,7 +117,6 @@ function Comment({propComment, fetchAccount, setCommentsArr, containerClient}){
     useEffect(()=>{
 
         injectImages();
-
     },[]);
 
 
@@ -135,7 +134,7 @@ return(
                      alt="avatar"/>
                     <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link">{comment.account?.userName}</a>
                     <span
-                        className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2"><TimeAgo date={comment.createdDate}  /></span>
+                        className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">commented {Boolean(comment.createdDate) && <TimeAgo date={Date.parse(comment.createdDate)}  />}</span>
 
             </div>
 
@@ -159,12 +158,15 @@ return(
 
 
         </div>
-        <ContentEditable
-            className={"mt-2 text-gray-300"}
-            html={comment.content}
-            onChange={()=>{}}
-            disabled={true}
-        />
+        {
+            Boolean(comment.content) &&
+            <ContentEditable
+                className={"mt-2 text-gray-300"}
+                html={comment.content}
+                onChange={()=>{}}
+                disabled={true}
+            />
+        }
 
 
 

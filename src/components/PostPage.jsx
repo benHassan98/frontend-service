@@ -1,12 +1,9 @@
 import React from 'react';
-import {useSearchParams} from "react-router-dom";
+import {useParams} from "react-router-dom";
 import Post from "./Post.jsx";
 function PostPage ({account, fetchAccount, setToast}){
 
-    const [searchParams,] = useSearchParams();
-    const id = searchParams.get('id');
-
-
+    const {id} = useParams();
 
 
     return (
