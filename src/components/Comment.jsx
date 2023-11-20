@@ -8,6 +8,7 @@ import parse from "html-react-parser";
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 import {useCookies} from "react-cookie";
 import {useNavigate} from "react-router-dom";
+import TimeAgo from "react-timeago";
 function Comment({propComment, fetchAccount, setCommentsArr, containerClient}){
 
     const [comment, setComment] = useState({});
@@ -20,14 +21,7 @@ function Comment({propComment, fetchAccount, setCommentsArr, containerClient}){
 
     const injectImages = async ()=>{
 
-        const isEdited = propComment.isEdited;
         const account = await fetchAccount(propComment.accountId);
-
-        const blobClient = containerClient.getBlobClient(account.picture);
-        const blob = await blobClient.download();
-        const blobBody = await blob.blobBody;
-
-        account.pictureURL = URL.createObjectURL(blobBody);
 
         const imagesNameArr = [];
         const urlToSrc = {};
@@ -62,12 +56,13 @@ function Comment({propComment, fetchAccount, setCommentsArr, containerClient}){
             account,
             newContent,
             urlToSrc,
-            isEdited
         });
 
 
     };
-    const deleteCommentRequest = ()=>{
+    const deleteCommentRequest = (e)=>{
+
+        if(e){e.preventDefault();}
 
         fetch(import.meta.env.VITE_POST_SERVICE+"/"+comment.id,{
             method:"DELETE",
@@ -136,12 +131,11 @@ return(
 
             <div className="flex items-center">
                 <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                     src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
+                     src={comment.account?.picture}
                      alt="avatar"/>
-                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link">Khatab
-                        wedaa</a>
+                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link">{comment.account?.userName}</a>
                     <span
-                        className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2"> posted today at 2:04 PM</span>
+                        className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2"><TimeAgo date={comment.createdDate}  /></span>
 
             </div>
 
@@ -149,6 +143,7 @@ return(
 
 
                 <div
+                    onClick={()=>deleteCommentRequest()}
                     className="hover:bg-black rounded-full transition-colors duration-300 transform w-8 h-8 flex items-center justify-center cursor-pointer">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-6 h-6"
                          style={{color:"#9ca3af"}}>
@@ -164,16 +159,12 @@ return(
 
 
         </div>
-        <p className="mt-2 text-gray-600 dark:text-gray-300">lllllllllLorem ipsum dolor sit, amet consectetur
-            adipisicing elit. Tempora expedita dicta totam aspernatur doloremque. Excepturi iste iusto eos enim
-            reprehenderit nisi, accusamus delectus nihil quis facere in modi ratione libero!</p>
-
-        {/*<ContentEditable*/}
-        {/*    className={"mt-2 text-gray-300"}*/}
-        {/*    html={comment.content}*/}
-        {/*    onChange={()=>{}}*/}
-        {/*    disabled={true}*/}
-        {/*/>*/}
+        <ContentEditable
+            className={"mt-2 text-gray-300"}
+            html={comment.content}
+            onChange={()=>{}}
+            disabled={true}
+        />
 
 
 

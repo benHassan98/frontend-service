@@ -13,14 +13,15 @@ import { EditorContent, useEditor} from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import Comment from "./Comment.jsx";
+import axios from "axios";
 
 function Post({postProp, id, account, withCommentAccordion = true, fetchAccount, setPostsArr, setToast}){
 
-    const [post, setPost] = useState(postProp);
+    const [post, setPost] = useState({});
+    const [postAccount, setPostAccount] = useState({});
     const [isVisibleToFollowers, setIsVisibleToFollowers] = useState(false);
     const [postContent, setPostContent] = useState("<p>Lorem ipsum dolor sit, amet consectetur adipisicing elit. Tempora expedita dicta</p>");
     const [editPostContent, setEditPostContent] = useState("");
-    const [postAccount, setPostAccount] = useState({});
     const [postArr, setPostArr] = useState([]);
     const [likesArr, setLikesArr] = useState([]);
     const [commentsArr, setCommentsArr] = useState([]);
@@ -37,9 +38,10 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
     const extensions = [
         StarterKit,
         Image.configure({
+
             HTMLAttributes:{
-                class:"w-6 h-6",
-                'is-new':true
+                class:"w-15 h-15",
+
             }
         }),
 
@@ -58,9 +60,9 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
     const defaultSanitizeOptions = {
         allowedTags: [ 'img', 'div', 'p' ],
         allowedAttributes: {
-            'img': [  'src', 'alt', 'class', 'is-new' ],
+            'img': [  'src', 'alt', 'class' ],
             'div': ['class', 'id'],
-            'p': ['class', 'id']
+            'p':   ['class', 'id']
         },
         allowedSchemesByTag: {'img':['blob','http','https']},
     };
@@ -127,12 +129,15 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
     //         setImage(URL.createObjectURL(blobBody));
     //     });
 
-    const isImageExists = (id, content)=>{
+    const isImageExists = (url, content)=>{
         let exists = false;
 
         parse(content,{
             replace(domNode){
-                exists |= (domNode.attribs.src.includes(id));
+                if(domNode.name === 'img'){
+                    exists |= (domNode.attribs.src.includes(url));
+                }
+
                 return domNode;
             }
         });
@@ -141,7 +146,10 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
         return exists;
     };
 
-    const deletePostRequest = ()=>{
+    const deletePostRequest = (e)=>{
+
+        if(e){e.preventDefault();}
+
         fetch(import.meta.env.VITE_POST_SERVICE+"/"+post.id,{
             method:"DELETE",
             headers:{
@@ -159,7 +167,6 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                         navigate("/");
                     }
                 }
-
                 else if(res.status === 401){
 
                     fetch(import.meta.env.VITE_REFRESH_TOKEN,{
@@ -198,39 +205,70 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
         if(e){e.preventDefault();}
 
-        let html = sanitizeHtml(postContent, defaultSanitizeOptions);
+        let html = sanitizeHtml(editPostContent, defaultSanitizeOptions);
         const urlToSrc = postArr[0].currPost.urlToSrc;
 
         for(let [k,v] of Object.entries(urlToSrc)){
             html = html.replace(k,v);
         }
-
-        const imageList = updatePostImageList.filter(image=>isImageExists(image.id,html)).map(image=>image.file);
-
-
-        let formData = new FormData();
-        formData.append("post",{
-            ...post,
-            content:html,
-            imageList
+        // console.log(updatePostImageList);
+        const imageList = updatePostImageList.filter(image=>isImageExists(image.url,html));
+        imageList.forEach(image=>{
+            html = html.replace(image.url, image.id);
+            URL.revokeObjectURL(image.url);
         });
 
-        fetch(import.meta.env.VITE_POST_SERVICE+"/update",{
-            method:"PUT",
-            body:formData,
-            headers:{
-                "Content-Type": "application/x-www-form-urlencoded",
+
+
+        const updatedPost = {
+            ...post,
+            content:html,
+            isEdited:true,
+            imageList
+        };
+        const formData = new FormData();
+
+        Object.entries(updatedPost).forEach(([k,v])=>{
+
+            if(v){
+
+                if(k === 'imageList'){
+                    v.forEach(image=>{
+                        formData.append("idList",image.id);
+                        formData.append("fileList",image.file);
+                    });
+
+                }
+                else{
+                    formData.append(k,v);
+                }
+
+            }
+
+        });
+
+
+        // console.log("html: ",html);
+        // console.log("formData: ",formData);
+        axios({
+            method: 'PUT',
+            url: import.meta.env.VITE_POST_SERVICE+"/update",
+            data: formData,
+            headers: {
+                'Content-Type': 'multipart/form-data',
                 "Authorization": `Bearer  ${accessToken}`
             },
-            credentials:"include",
-        })
-            .then( async (res)=>{
+            withCredentials:true
+        }).then( async (res)=>{
                 if(res.status === 200){
-                    const data = await res.json();
+                    const data =  res.data;
                     const tempPostsArr = await extractPostContent(data);
 
                     setPost(data);
+                    setEditPostContent(tempPostsArr[0].currPost.content);
                     setPostArr([...tempPostsArr]);
+                    setLikesArr([...data.likesList]);
+                    setCommentsArr([...data.commentsList]);
 
                 }
                 else if(res.status === 401){
@@ -288,15 +326,21 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
         const friendsVisibilityType = isPublic? false : (selectedCnt<friendsArr.length);
         const visibleToFriendList = friendsArr.filter(friend=>friend.isSelected===friendsVisibilityType).map(friend=>friend.id);
-        const content = isPublic?
+        let content = isPublic?
             sanitizeHtml(publicSharedContent,defaultSanitizeOptions):
             sanitizeHtml(privateSharedContent,defaultSanitizeOptions)
         let imageList = isPublic?publicSharedPostImageList:privateSharedPostImageList;
-        imageList = imageList.filter(image=>isImageExists(image.id,content)).map(image=>image.file);
+        imageList = imageList.filter(image=>isImageExists(image.url,content));
+        imageList.forEach(image=>{
+            content.replace(image.url, image.id);
+            URL.revokeObjectURL(image.url);
+        });
 
 
-        let formData = new FormData();
-        formData.append("post",{
+
+        const formData = new FormData();
+
+        const sharedPost = {
             accountId:account.id,
             content,
             imageList,
@@ -304,18 +348,38 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
             isVisibleToFollowers,
             friendsVisibilityType,
             visibleToFriendList
+        };
+
+
+        Object.entries(sharedPost).forEach(([k,v])=>{
+
+            if(v){
+
+                if(k === 'imageList'){
+                    v.forEach(image=>{
+                        formData.append("idList",image.id);
+                        formData.append("fileList",image.file);
+                    });
+
+                }
+                else{
+                    formData.append(k,v);
+                }
+
+            }
+
         });
 
-        fetch(import.meta.env.VITE_POST_SERVICE+"/create",{
-            method:"POST",
-            body:formData,
-            headers:{
-                "Content-Type": "application/x-www-form-urlencoded",
+        axios({
+            method: 'POST',
+            url: import.meta.env.VITE_POST_SERVICE+"/create",
+            data: formData,
+            headers: {
+                'Content-Type': 'multipart/form-data',
                 "Authorization": `Bearer  ${accessToken}`
             },
-            credentials:"include"
-        })
-            .then( async (res)=>{
+            withCredentials:true
+        }).then( async (res)=>{
                 if(res.status === 200){
                     setToast("Post Shared just Now");
                 }
@@ -362,7 +426,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
             accountId:account.id,
             post,
             content,
-            imageList:newCommentImageList.filter(image=>isImageExists(image.id,content)).map(image=>image.file)
+            imageList:newCommentImageList.filter(image=>isImageExists(image.url,content))
         });
 
         fetch(import.meta.env.VITE_POST_SERVICE+'/comment/create',{
@@ -437,19 +501,11 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
         let currPost = post;
          while(currPost){
              const isShared = Boolean(currPost.sharedFromPost);
-             const isEdited = currPost.isEdited;
+             const isEdited = Boolean(currPost.isEdited);
              const postAccount = await fetchAccount(currPost.accountId);
-
-             const blobClient = containerClient.getBlobClient(postAccount.picture);
-             const blob = await blobClient.download();
-             const blobBody = await blob.blobBody;
-
-              postAccount.pictureURL = URL.createObjectURL(blobBody);
 
               const imagesNameArr = [];
               const urlToSrc = {};
-
-
 
               parse(currPost.content,{
                  replace(domNode){
@@ -487,7 +543,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                  isEdited,
                  isShared,
                  postAccount,
-                 post:currPost,
+                 currPost,
 
              });
 
@@ -498,9 +554,28 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
         return postContentArr;
     };
+
+    const setPostStates = async (data)=>{
+
+        const tempPostsArr = await extractPostContent(data);
+
+        const dataAccount = await fetchAccount(data.accountId);
+
+        console.log("postArr: ",tempPostsArr);
+
+
+
+        setPost({...data});
+        setPostAccount({...dataAccount});
+        setPostContent(tempPostsArr[0].currPost.content);
+        setEditPostContent(tempPostsArr[0].currPost.content);
+        setPostArr([...tempPostsArr]);
+        setLikesArr([...data.likesList]);
+        setCommentsArr([...data.commentsList]);
+    };
     const fetchPost = ()=>{
 
-        fetch(import.meta.env.VITE_POST_SERVICE+"/"+id,{
+        fetch(import.meta.env.VITE_POST_SERVICE+"/9",{
             method:"GET",
             headers:{
                 "Content-Type": "application/json",
@@ -512,15 +587,9 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                 if(res.status === 200){
                     const data = await res.json();
 
+                    console.log("data: ",data);
 
-                    const tempPostsArr = await extractPostContent(data);
-
-
-                    setPost(data);
-                    editPostEditor.commands.setContent(tempPostsArr[0].currPost.content);
-                    setPostArr([...tempPostsArr]);
-                    setLikesArr([...data.likesList]);
-                    setCommentsArr([...data.commentsList]);
+                   setPostStates(data);
                 }
                 else if(res.status === 401){
                     fetch(import.meta.env.VITE_REFRESH_TOKEN,{
@@ -558,14 +627,79 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
     };
 
 
-    // useEffect(()=>{
-    //
-    //
-    //     if(!postProp)
-    //         fetchPost();
-    //
-    //
-    // },[]);
+    useEffect(()=>{
+
+
+        if(!postProp)
+            fetchPost();
+        else{
+            setPostStates(postProp);
+        }
+
+    },[]);
+
+    useEffect(()=>{
+        let socket = new SockJS(import.meta.env.VITE_POST_SERVICE+"/post/websocket");
+        let stompClient = Stomp.over(socket);
+        stompClient.connect({}, function (frame) {
+
+            console.log('Connected: ' + frame);
+
+            stompClient.subscribe(`/topic/post.${id}.add`,
+                 async (req) => {
+
+                const reqBody = JSON.parse(req.body);
+
+                     console.log("NEW");
+                     console.log(reqBody);
+                if(!reqBody.id){
+                    const newLikeAccount = await fetchAccount(reqBody.accountId);
+                    setLikesArr(prevState => [...prevState, newLikeAccount]);
+                    console.log("Like");
+
+                }
+                else{
+                    setCommentsArr(prevState => [...prevState, reqBody]);
+                    console.log("Comment");
+                }
+
+
+
+                });
+
+            stompClient.subscribe(`/topic/post.${id}.remove`,
+                async (req) => {
+                    console.log("REMOVE");
+                    const reqBody = JSON.parse(req.body);
+
+                    console.log(reqBody);
+                    if(!reqBody.id){
+
+                        setLikesArr(prevState => [...prevState.filter(likeAccount=>likeAccount.id !== reqBody.accountId)]);
+
+                        console.log("Like");
+
+                    }
+                    else{
+                        setCommentsArr(prevState => [...prevState.filter(comment=>comment.id !== reqBody.id)])
+                        console.log("Comment");
+                    }
+
+
+
+                });
+
+
+
+        });
+
+        setStompClient(stompClient);
+
+
+    },[]);
+
+
+
 
 
 
@@ -575,17 +709,21 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
                 <div className="flex items-center">
                     <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                         src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
+                         src={postAccount.picture}
                          alt="avatar"/>
-                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link">Khatab
-                        wedaa</a>
+                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link">{postAccount.userName}</a>
                     <span
-                        className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2"> shared today at 2:04 PM</span>
-                    <span className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2"> Edited</span>
+                        className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">
+                        shared {Boolean(post.sharedFromPost) && <TimeAgo date={post.createdDate}/>}
+                    </span>
+                    <span className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">{post.isEdited && "Edited"}</span>
 
                 </div>
                 <div className="flex items-center gap-2">
                     <div
+                        onClick={()=>{
+                            editPostEditor.commands.setContent(postArr[0].currPost.content);
+                        }}
                         data-hs-overlay={"#editModal"}
                         className="hover:bg-black rounded-full transition-colors duration-300 transform w-8 h-8 flex items-center justify-center cursor-pointer">
 
@@ -640,7 +778,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                             <div className="flex justify-end mt-2 gap-1">
                                                 <label
                                                     htmlFor={"postEditImageInput"}
-                                                    className="px-4 py-2.5 leading-5 text-white transition-colors duration-300 transform bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:bg-gray-600">
+                                                    className="cursor-pointer px-4 py-2.5 leading-5 text-white transition-colors duration-300 transform bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:bg-gray-600">
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24">
                                                         <path fill="currentColor"
                                                               d="M23 4v2h-3v3h-2V6h-3V4h3V1h2v3h3zm-8.5 7a1.5 1.5 0 1 0-.001-3.001A1.5 1.5 0 0 0 14.5 11zm3.5 3.234l-.513-.57a2 2 0 0 0-2.976 0l-.656.731L9 9l-3 3.333V6h7V4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7h-2v3.234z"/>
@@ -651,22 +789,32 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                         onChange={(e)=>{
                                                             const newImage = e.target.files[0];
                                                             const newImageUrl = URL.createObjectURL(newImage);
+                                                            const newImageId = newImageUrl.split("/").reverse()[0]+"-"+Date.now();
 
-                                                            editPostEditor.chain().focus().setImage({
-                                                                src:newImageUrl,
-                                                                alt:newImage.name
-                                                            })
-                                                                .run();
+                                                            editPostEditor.commands
+                                                                .setContent(
+                                                                    editPostEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} />`
+                                                                );
+
+                                                            setEditPostContent((prevState)=>prevState+`<img src=${newImageUrl} alt=${newImage.name} class="w-15 h-15" />`);
 
                                                             setUpdatePostImageList((prevState)=>[...prevState, {
-                                                                id:newImageUrl,
+                                                                id:newImageId,
+                                                                url:newImageUrl,
                                                                 file:newImage
                                                             }]);
+
+                                                            console.log({
+                                                                id:newImageId,
+                                                                url:newImageUrl,
+                                                                file:newImage
+                                                            });
 
                                                         }}
                                                 />
 
                                                 <button
+                                                    onClick={(e)=>updatePostRequest(e)}
                                                     className="px-8 py-2.5 leading-5 text-white transition-colors duration-300 transform bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:bg-gray-600">Edit
                                                 </button>
                                             </div>
@@ -884,18 +1032,21 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                             onChange={(e)=>{
                                                                 const newImage = e.target.files[0];
                                                                 const newImageUrl = URL.createObjectURL(newImage);
-                                                                publicSharedPostEditor.chain().focus().setImage({
-                                                                    src:newImageUrl,
-                                                                    alt:newImage.name
-                                                                })
-                                                                    .run();
+                                                                const newImageId = newImageUrl.split("/").reverse()[0]+"-"+Date.now();
+
+                                                                publicSharedPostEditor.commands
+                                                                    .setContent(
+                                                                        publicSharedPostEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} class="w-15 h-15" />`
+                                                                    );
                                                                 setPublicSharedPostImageList((prevState)=>[...prevState, {
-                                                                    id:newImageUrl,
+                                                                    id:newImageId,
+                                                                    url:newImageUrl,
                                                                     file:newImage
                                                                 }]);
                                                             }}
                                                     />
                                                     <button
+                                                        onClick={(e)=>sharePostRequest(true, e)}
                                                         className="px-8 py-2.5 leading-5 text-white transition-colors duration-300 transform bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:bg-gray-600">Share
                                                     </button>
                                                 </div>
@@ -977,13 +1128,16 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                             onChange={(e)=>{
                                                                 const newImage = e.target.files[0];
                                                                 const newImageUrl = URL.createObjectURL(newImage);
-                                                                privateSharedPostEditor.chain().focus().setImage({
-                                                                    src:newImageUrl,
-                                                                    alt:newImage.name
-                                                                }).run();
+                                                                const newImageId = newImageUrl.split("/").reverse()[0]+"-"+Date.now();
+
+                                                                privateSharedPostEditor.commands
+                                                                    .setContent(
+                                                                        privateSharedPostEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} class="w-15 h-15" />`
+                                                                    );
 
                                                                 setPrivateSharedPostImageList((prevState)=>[...prevState, {
-                                                                    id:newImageUrl,
+                                                                    id:newImageId,
+                                                                    url:newImageUrl,
                                                                     file:newImage
                                                                 }]);
                                                             }}
@@ -997,55 +1151,49 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
                                             </form>
 
-                                            <div className="p-6 space-y-6 bg-gray-700 rounded-md overflow-y">
-                                                <div
-                                                    onClick={e=>{
-                                                        if(e.currentTarget.classList.contains("hover:bg-gray-600")){
-                                                            e.currentTarget.classList.replace(
-                                                                "hover:bg-gray-600",
-                                                                "bg-gray-600"
-                                                                );
-                                                        }
-                                                        else{
-                                                            e.currentTarget.classList.replace(
-                                                                "bg-gray-600",
-                                                                "hover:bg-gray-600"
-                                                                );
-                                                        }
-                                                    }}
-                                                    className="flex items-center gap-2 mb-2 rounded-md p-1 transition-colors duration-300 transform hover:bg-gray-600">
-
-                                                    <img
-                                                        className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                                                        src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                                        alt="avatar"/>
-                                                        <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
-                                                           tabIndex="0" role="link">Khatab wedaa</a>
+                                            <div className="p-6 space-y-6 bg-gray-700 rounded-md overflow-y" ref={friendsRef}>
 
 
-                                                </div>
+                                                {
+                                                    account.friendList?.map((friend, i)=>{
+
+                                                        return(
+                                                            <div
+                                                                key={i}
+                                                                onClick={e=>{
+                                                                    if(e.currentTarget.classList.contains("hover:bg-gray-600")){
+                                                                        e.currentTarget.classList.replace(
+                                                                            "hover:bg-gray-600",
+                                                                            "bg-gray-600"
+                                                                        );
+                                                                    }
+                                                                    else{
+                                                                        e.currentTarget.classList.replace(
+                                                                            "bg-gray-600",
+                                                                            "hover:bg-gray-600"
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                className="flex items-center gap-2 mb-2 rounded-md p-1 transition-colors duration-300 transform hover:bg-gray-600">
+
+                                                                <img
+                                                                    className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
+                                                                    src={friend.picture}
+                                                                    alt="avatar"/>
+                                                                <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
+                                                                   tabIndex="0" role="link">{friend.userName}</a>
 
 
-                                                <div
-                                                    className="flex items-center gap-2 mb-2 transition-colors duration-300 transform hover:bg-gray-600 rounded-md p-1 ">
-                                                    <img
-                                                        className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                                                        src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                                        alt="avatar"/>
-                                                        <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
-                                                           tabIndex="0" role="link">Khatab wedaa</a>
-                                                </div>
+                                                            </div>
+
+                                                        );
 
 
-                                                <div
-                                                    className="flex items-center gap-2 mb-2 transition-colors duration-300 transform hover:bg-gray-600 rounded-md p-1">
-                                                    <img
-                                                        className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
-                                                        src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                                        alt="avatar"/>
-                                                        <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
-                                                           tabIndex="0" role="link">Khatab wedaa</a>
-                                                </div>
+
+                                                    })
+
+
+                                                }
 
 
                                             </div>
@@ -1184,7 +1332,13 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
 
                     </div>
-
+                    {
+                        commentsArr.map((comment, i)=>{
+                            return (
+                                <Comment key={i} propComment={comment} setCommentsArr={setCommentsArr} fetchAccount={fetchAccount} containerClient={containerClient} />
+                                );
+                        })
+                    }
 
                     <form className="p-1 mx-auto rounded-md bg-gray-800">
 
@@ -1204,21 +1358,26 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                             onChange={(e)=>{
                                 const newImage = e.target.files[0];
                                 const newImageUrl = URL.createObjectURL(newImage);
-                                commentEditor.chain().focus().setImage({
-                                    src:newImageUrl,
-                                    alt:newImage.name
-                                })
-                                    .run();
+                                const newImageId = newImageUrl.split("/").reverse()[0]+"-"+Date.now();
+
+
+                                commentEditor.commands
+                                    .setContent(
+                                        commentEditor.getHTML()+`<img src=${newImageUrl} alt=${newImage.name} class="w-15 h-15" />`
+                                    );
+
                                 setNewCommentImageList((prevState)=>[...prevState, {
-                                    id:newImageUrl,
+                                    id:newImageId,
+                                    url:newImageUrl,
                                     file:newImage
-                                }])
+                                }]);
 
                             }
 
                             }
                             />
                             <button
+                                // onClick={(e)=>newCommentRequest(e)}
                                 onClick={(e)=>newCommentRequest(e)}
                                 className="px-8 py-2.5 leading-5 text-white transition-colors duration-300 transform bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:bg-gray-600">Comment
                             </button>

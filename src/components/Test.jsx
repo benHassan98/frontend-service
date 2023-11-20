@@ -16,6 +16,8 @@ import AtomicBlockUtils from "draft-js/lib/AtomicBlockUtils.js";
 import { EditorContent, useEditor} from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
+import ContentEditable from "react-contenteditable";
+import axios from "axios";
 // function Test(){
 //     const testRef = useRef([]);
 //     const testRefFun = ()=>{
@@ -63,6 +65,8 @@ function Test(){
         },
         onUpdate:({editor})=>{
           console.log(editor.getHTML());
+          let str = "blob:http://localhost:5173/acc50e6d-a95b-4170-8e88-617c19266ad7";
+          console.log(str.split("/").reverse()[0]+"-"+Date.now());
         },
 
     });
@@ -82,7 +86,23 @@ function Test(){
     const handleChange = (e)=>{
         testRef.current = e.target.value;
     };
-
+    function createFormData(object, form, namespace) {
+        const formData = form || new FormData();
+        for (let property in object) {
+            if (!object.hasOwnProperty(property) ||      !object[property]) {
+                continue;
+            }
+            const formKey = namespace ? `${namespace}[${property}]` : property;
+            if (object[property] instanceof Date) {
+                formData.append(formKey, object[property].toISOString());
+            } else if (typeof object[property] === 'object' && !(object[property] instanceof File)) {
+                createFormData(object[property], formData, formKey);
+            } else {
+                formData.append(formKey, object[property]);
+            }
+        }
+        return formData;
+    }
     const addImage = (url)=>{
 
         const entityKey = editorState // from STATE
@@ -187,6 +207,9 @@ function Test(){
     //
     // },[]);
 
+
+
+
     return (
         <>
 
@@ -225,7 +248,8 @@ function Test(){
             />
 
             <button className={"mr-8"} onClick={()=>{
-                setCookie("refresh_token","LgLbhAKvdlzsS_ggEtK39b2_IEHFd0WXNXix1tmDLR5Dz9_inDOraFSc_ax2gegtd7D0Jx5oAQwDv1Mk6pc5hj_iClH7v5fDZJ9gb0FvlZnPvRPXAxQhq9lW424OFYkT");
+                // setCookie("refresh_token","LgLbhAKvdlzsS_ggEtK39b2_IEHFd0WXNXix1tmDLR5Dz9_inDOraFSc_ax2gegtd7D0Jx5oAQwDv1Mk6pc5hj_iClH7v5fDZJ9gb0FvlZnPvRPXAxQhq9lW424OFYkT");
+                editor.commands.setContent("<p>HellWorld</p>");
             }}>
                 Cookie
             </button>
@@ -356,16 +380,48 @@ function Test(){
                 //     })
                 // );
 
-                fetch("http://localhost:8888/refresh",{
-                    method:'GET',
-                    credentials:'include'
+                // fetch("http://localhost:8888/refresh",{
+                //     method:'GET',
+                //     credentials:'include'
+                // })
+                //     .then(res=>res.json())
+                //     .then(res=>{
+                //         console.log(res);
+                //     });
+                //
+                const form = new FormData();
+                // form.append("file",filesList[0]);
+                //
+                // form.append("id","1");
+
+                form.append('id','1');
+                form.append("file",filesList[0]);
+
+                form.append("imageList",filesList[0]);
+                form.append("imageList",filesList[0]);
+
+                form.append("idList","1");
+                form.append("idList","2");
+
+                axios({
+                    method: 'post',
+                    url: import.meta.env.VITE_POST_SERVICE+"/test/test",
+                    data: form,
+                    headers: {'Content-Type': 'multipart/form-data' }
                 })
-                    .then(res=>res.json())
-                    .then(res=>{
-                        console.log(res);
-                    });
+                    .then(res=>console.log(res.status));
+                // form.append("testOb",{
+                //    id:1,
+                //    file:filesList[0]
+                // });
 
-
+                // fetch(import.meta.env.VITE_POST_SERVICE+"/test/test",{
+                //     method:"POST",
+                //     body:form,
+                //     credentials:"include",
+                //
+                // })
+                //     .then(res=>console.log(res.status));
 
                 // let socket = new SockJS("http://localhost:8081/websocket");
                 // let stompClient = Stomp.over(socket);
@@ -429,11 +485,11 @@ function Test(){
             }}>Add Image</button>
 
             {/*<div ref={tiptapRef} className="element overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"></div>*/}
-            {/*<ContentEditable*/}
-            {/*    style={{columns:"4 20rem"}}*/}
-            {/*    html={testRef.current}*/}
-            {/*    onChange={handleChange}*/}
-            {/*    className="overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"/>*/}
+            <ContentEditable
+                style={{columns:"4 20rem"}}
+                html={testRef.current}
+                onChange={handleChange}
+                className="overflow-y-auto  block  mt-2 max-w-sm h-[30rem]  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"/>
 
 
             {/*<Editor editorStyle={{lineHeight: '75%'}} editorState={editorState} onEditorStateChange={setEditorState}  editorClassName={"overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"}  />*/}

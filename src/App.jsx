@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import {useEffect, useRef, useState} from 'react'
 import SignUp from './components/SignUp.jsx';
 import Login from './components/Login.jsx';
 import Home from './components/Home.jsx';
 import Settings from "./components/Settings.jsx";
-import Post from "./components/Post.jsx";
 import Redirect from "./components/Redirect.jsx";
 import Navbar from './components/Navbar.jsx';
 import './App.css'
@@ -13,18 +12,11 @@ import {BrowserRouter, Route, Routes} from "react-router-dom";
 import NewPasswordForm from "./components/NewPasswordForm.jsx";
 import EmailForm from "./components/EmailForm.jsx";
 import Test from "./components/Test.jsx";
-import dumb from "./components/dumb.jpg";
 import PostPage from "./components/PostPage.jsx";
+import {BlobServiceClient} from "@azure/storage-blob";
 
 function App() {
-    const [account,setAccount] = useState({
-        email:'example@gmail.com',
-        fullName:"Ibrahim Al White",
-        userName:"HemaWhite",
-        isVerified:true,
-        image:dumb,
-        aboutMe:"Basically nothing"
-    });
+    const [account,setAccount] = useState({});
     const [accessToken, setAccessToken] = useState(null);
     const [toastText,setToastText] = useState("");
     const [successText,setSuccessText] = useState("");
@@ -34,9 +26,71 @@ function App() {
     const successRef = useRef();
     const infoRef = useRef();
     const dangerRef = useRef();
-    const [cookies] = useCookies(['XSRF-TOKEN']);
-    const fetchAccount = async ()=>{
-        return {};
+    const [,,removeCookie] = useCookies();
+
+
+
+    const fetchAccount = async (id)=>{
+        const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
+        const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
+
+
+        try{
+            const res = await fetch(import.meta.env.VITE_ACCOUNT_SERVICE+'/account/'+id,{
+                method:"GET",
+                headers:{
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer  ${accessToken}`
+                },
+                credentials:"include"
+            });
+
+            if(res.status === 200){
+                const accountRes = await res.json();
+                const blobClient = containerClient.getBlobClient(accountRes.picture);
+                const blob = await blobClient.download();
+                const blobBody = await blob.blobBody;
+
+                accountRes.picture = URL.createObjectURL(blobBody);
+
+                return accountRes;
+            }
+            else if(res.status === 401){
+               const refRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN,{
+                    method:"GET",
+                    headers:{
+                        "Content-Type": "application/json",
+                    },
+                    credentials:"include"
+                });
+               if(refRes.status === 200){
+                   const data = await res.json();
+                   setAccessToken(data.access_token);
+                   fetchAccount(id);
+               }
+               else{
+                   removeCookie("refresh_token");
+                   removeCookie("JSESSIONID");
+                   setAccessToken(null);
+                   setAccount(null);
+               }
+
+
+            }
+            else {
+                console.error(res.statusText);
+
+            }
+        }
+        catch (e){
+            console.error(e);
+
+        }
+
+
+
+        // return fetch(import.meta.env.VITE_ACCOUNT_SERVICE+'/account/'+id);
+
     };
 
 
@@ -74,6 +128,27 @@ function App() {
 
     };
 
+    useEffect(()=>{
+         fetchAccount(10)
+             .then(async (res)=>{
+                 const friendList = [];
+
+                 for(let i = 0;i<res.friendList.length;i++){
+
+                     const friend = await fetchAccount(res.friendList[i]);
+                     friendList.push(friend);
+
+                 }
+
+                 setAccount({
+                     ...res,
+                     friendList
+                 });
+
+             })
+             .catch(err=>console.error(err));
+
+    });
     // useEffect(()=>{
     //     console.log("Cookies: ",cookies);
     //     fetch(import.meta.env.VITE_API_URL+"/account",{
@@ -113,7 +188,7 @@ function App() {
               <Route path={"/"} element={<Home account={account}/>}/>
               <Route path={"/signup"} element={<SignUp setInfoToast={setInfoToast} />}/>
               <Route path={"/login"} element={<Login setAccount={setAccount} setInfoToast={setInfoToast}  />}/>
-              <Route path={"/post/:id"} element={<PostPage account={account} fetchAccount={fetchAccount} />}/>
+              <Route path={"/post/:id"} element={<PostPage account={account} fetchAccount={fetchAccount} setToast={setToast} />}/>
               <Route path={"/settings"} element={<Settings account={account} setSuccessToast={setSuccessToast} setInfoToast={setInfoToast} setDangerToast={setDangerToast} />}/>
               <Route path={"/redirect"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
               <Route path={"/resetPassword"} element={<NewPasswordForm setSuccessToast={setSuccessToast}/>}/>
