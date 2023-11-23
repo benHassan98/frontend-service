@@ -1,15 +1,4 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/*#root{*/
-/*    height: 100vh;*/
-/*    width:  100vw;*/
-/*}*/
-.notification{
-    opacity: 0%;
-    transition: 1s;
-}
-.notification-transform{
-    opacity: 100%;
-}
 

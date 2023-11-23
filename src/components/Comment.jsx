@@ -9,7 +9,7 @@ import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 import {useCookies} from "react-cookie";
 import {useNavigate} from "react-router-dom";
 import TimeAgo from "react-timeago";
-function Comment({propComment, fetchAccount, setCommentsArr, containerClient}){
+function Comment({propComment, fetchAccount, setCommentsArr, containerClient, showDelete}){
 
     const [comment, setComment] = useState({});
 
@@ -54,7 +54,7 @@ function Comment({propComment, fetchAccount, setCommentsArr, containerClient}){
         setComment({
             ...propComment,
             account,
-            newContent,
+            content:newContent,
             urlToSrc,
         });
 
@@ -64,7 +64,7 @@ function Comment({propComment, fetchAccount, setCommentsArr, containerClient}){
 
         if(e){e.preventDefault();}
 
-        fetch(import.meta.env.VITE_POST_SERVICE+"/"+comment.id,{
+        fetch(import.meta.env.VITE_POST_SERVICE+"/comment/"+comment.id,{
             method:"DELETE",
             headers:{
                 "Content-Type": "application/json",
@@ -138,23 +138,26 @@ return(
 
             </div>
 
-            <div className="flex items-center">
+            {
+                showDelete &&
+                <div className="flex items-center">
 
 
-                <div
-                    onClick={()=>deleteCommentRequest()}
-                    className="hover:bg-black rounded-full transition-colors duration-300 transform w-8 h-8 flex items-center justify-center cursor-pointer">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-6 h-6"
-                         style={{color:"#9ca3af"}}>
-                        <path fill="currentColor"
-                              d="M7 21q-.825 0-1.412-.587Q5 19.825 5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413Q17.825 21 17 21ZM17 6H7v13h10ZM9 17h2V8H9Zm4 0h2V8h-2ZM7 6v13Z"/>
-                    </svg>
+                    <div
+                        onClick={(e)=>deleteCommentRequest(e)}
+                        className="hover:bg-black rounded-full transition-colors duration-300 transform w-8 h-8 flex items-center justify-center cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-6 h-6"
+                             style={{color:"#9ca3af"}}>
+                            <path fill="currentColor"
+                                  d="M7 21q-.825 0-1.412-.587Q5 19.825 5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413Q17.825 21 17 21ZM17 6H7v13h10ZM9 17h2V8H9Zm4 0h2V8h-2ZM7 6v13Z"/>
+                        </svg>
+
+                    </div>
+
+
 
                 </div>
-
-
-
-            </div>
+            }
 
 
         </div>

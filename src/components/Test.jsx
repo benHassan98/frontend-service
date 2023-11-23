@@ -8,6 +8,7 @@ import {useNavigate, useResolvedPath, useSearchParams} from "react-router-dom";
 import parse from 'html-react-parser';
 // import axios from "axios";
 import ReactDOMServer from 'react-dom/server';
+import TimeAgo from 'react-timeago';
 // import ContentEditable from "react-contenteditable";
 // import { Editor } from "react-draft-wysiwyg";
 import {EditorState} from "draft-js";
@@ -517,6 +518,13 @@ function Test(){
             {/*<button onClick={()=>{*/}
             {/*    console.log(editorState.getCurrentContent().getAllEntities());*/}
             {/*}}>convert</button>*/}
+            <TimeAgo date={Date.now()} minPeriod={60}/>
+
+
+
+
+
+
         </>
 
     )

@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react'
+import {useEffect, useState} from 'react'
 import SignUp from './components/SignUp.jsx';
 import Login from './components/Login.jsx';
 import Home from './components/Home.jsx';
@@ -16,16 +16,15 @@ import PostPage from "./components/PostPage.jsx";
 import {BlobServiceClient} from "@azure/storage-blob";
 
 function App() {
-    const [account,setAccount] = useState({});
+    const [account,setAccount] = useState(null);
     const [accessToken, setAccessToken] = useState("");
-    const [toastText,setToastText] = useState("");
     const [successText,setSuccessText] = useState("");
+    const [successFlag, setSuccessFlag] = useState(false);
     const [infoText,setInfoText] = useState("");
+    const [infoFlag, setInfoFlag] = useState(false);
     const [dangerText,setDangerText] = useState("");
-    const toastRef = useRef();
-    const successRef = useRef();
-    const infoRef = useRef();
-    const dangerRef = useRef();
+    const [dangerFlag, setDangerFlag] = useState(false);
+
     const [,,removeCookie] = useCookies();
 
 
@@ -47,7 +46,7 @@ function App() {
 
             if(res.status === 200){
                 const accountRes = await res.json();
-                const blobClient = containerClient.getBlobClient(accountRes.picture);
+                const blobClient = containerClient.getBlobClient(accountRes.picture);// account.accId/picId
                 const blob = await blobClient.download();
                 const blobBody = await blob.blobBody;
 
@@ -103,41 +102,33 @@ function App() {
 
 
     const toastsClear = ()=>{
-        toastRef.current.classList.remove("notification-transform");
-        successRef.current.classList.remove("notification-transform");
-        infoRef.current.classList.remove("notification-transform");
-        dangerRef.current.classList.remove("notification-transform");
-    };
-
-    const setToast = (text)=>{
-        toastsClear();
-        toastRef.current.classList.add("notification-transform");
-        setToastText(text);
+        setSuccessFlag(false);
+        setInfoFlag(false);
+        setDangerFlag(false);
     };
 
     const setSuccessToast = (text)=>{
         toastsClear();
-        successRef.current.classList.add("notification-transform");
+        setSuccessFlag(true);
         setSuccessText(text);
 
     };
 
     const setInfoToast = (text)=>{
         toastsClear();
-        infoRef.current.classList.add("notification-transform");
+        setInfoFlag(true);
         setInfoText(text);
-
     };
 
     const setDangerToast = (text)=>{
         toastsClear();
-        dangerRef.current.classList.add("notification-transform");
+        setDangerFlag(true);
         setDangerText(text);
 
     };
 
     useEffect(()=>{
-         fetchAccount(10)
+         fetchAccount(1)
              .then( (res)=>{
 
                  setAccount({
@@ -148,33 +139,7 @@ function App() {
              .catch(err=>console.error(err));
 
     },[]);
-    // useEffect(()=>{
-    //     console.log("Cookies: ",cookies);
-    //     fetch(import.meta.env.VITE_API_URL+"/account",{
-    //         method:"GET",
-    //         headers:{
-    //             "Content-Type": "application/json",
-    //             "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
-    //         },
-    //         credentials:"include"
-    //     })
-    //         .then( async (res)=>{
-    //             const isJson = res.headers
-    //                 .get("content-type")
-    //                 .includes("application/json");
-    //
-    //             const data = isJson ? await res.json() : null;
-    //             if(res.status === 200){
-    //                 setAccount(data.account);
-    //             }
-    //             else{
-    //                 return Promise.reject(res.status);
-    //             }
-    //
-    //         })
-    //         .catch(err=>console.error(err));
-    //
-    // },[]);
+
 
 
 
@@ -187,98 +152,101 @@ function App() {
               <Route path={"/"} element={<Home account={account}/>}/>
               <Route path={"/signup"} element={<SignUp setInfoToast={setInfoToast} />}/>
               <Route path={"/login"} element={<Login setAccount={setAccount} setInfoToast={setInfoToast}  />}/>
-              <Route path={"/post/:id"} element={<PostPage account={account} fetchAccount={fetchAccount} setToast={setToast} />}/>
+              <Route path={"/post/:id"} element={<PostPage account={account} fetchAccount={fetchAccount} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast} />}/>
               <Route path={"/settings"} element={<Settings account={account} setSuccessToast={setSuccessToast} setInfoToast={setInfoToast} setDangerToast={setDangerToast} />}/>
               <Route path={"/redirect"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
               <Route path={"/resetPassword"} element={<NewPasswordForm setSuccessToast={setSuccessToast}/>}/>
               <Route path={"/forgetPassword"} element={<EmailForm/>}/>
               <Route path={"/test"} element={<Test/>}/>
           </Routes>
-            <div id="toast-success"
-                 className="notification fixed bottom-5 right-5 flex items-center w-full max-w-xs p-4 mb-4 text-gray-500 bg-white rounded-lg shadow dark:text-gray-400 dark:bg-gray-800"
-                 role="alert"
-                 ref={successRef}
-            >
-                <div
-                    className="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-green-500 bg-green-100 rounded-lg dark:bg-green-800 dark:text-green-200">
-                    <svg className="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
-                         viewBox="0 0 20 20">
-                        <path
-                            d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z"/>
-                    </svg>
-                    <span className="sr-only">Check icon</span>
-                </div>
-                <div className="ml-3 text-sm font-normal">{successText}</div>
-                <button type="button"
-                        className="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex items-center justify-center h-8 w-8 dark:text-gray-500 dark:hover:text-white dark:bg-gray-800 dark:hover:bg-gray-700"
-                        aria-label="Close"
-                        onClick={()=>{successRef.current.classList.toggle("notification-transform")}}
 
-                >
-                    <span className="sr-only">Close</span>
-                    <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
-                         viewBox="0 0 14 14">
-                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                              d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
-                    </svg>
-                </button>
-            </div>
-            <div id="toast-danger"
-                 className="notification fixed bottom-5 right-5 flex items-center w-full max-w-xs p-4 mb-4 text-gray-500 bg-white rounded-lg shadow dark:text-gray-400 dark:bg-gray-800"
-                 role="alert"
-                 ref={dangerRef}
-            >
+            {
+                successFlag &&
                 <div
-                    className="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-red-500 bg-red-100 rounded-lg dark:bg-red-800 dark:text-red-200">
-                    <svg className="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
-                         viewBox="0 0 20 20">
-                        <path
-                            d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 11.793a1 1 0 1 1-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L8.586 10 6.293 7.707a1 1 0 0 1 1.414-1.414L10 8.586l2.293-2.293a1 1 0 0 1 1.414 1.414L11.414 10l2.293 2.293Z"/>
-                    </svg>
-                    <span className="sr-only">Error icon</span>
+                    id={"success-toast"}
+                    className="hs-removing:translate-x-5 hs-removing:opacity-0 transition duration-300 fixed bottom-5 right-5 w-[18rem] bg-teal-100 border border-teal-200 text-sm text-teal-800 rounded-lg dark:bg-teal-800/10 dark:border-teal-900 dark:text-teal-500"
+                    role="alert">
+                    <div className="flex p-4">
+                        {successText}
+                        <div className="ms-auto">
+                            <button
+                                data-hs-remove-element="#success-toast"
+                                type="button"
+                                className="inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-teal-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-teal-200">
+                                <span className="sr-only">Close</span>
+                                <svg className="flex-shrink-0 w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                     viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                                     strokeLinejoin="round">
+                                    <path d="M18 6 6 18"/>
+                                    <path d="m6 6 12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div className="ml-3 text-sm font-normal">{dangerText}</div>
-                <button type="button"
-                        className="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex items-center justify-center h-8 w-8 dark:text-gray-500 dark:hover:text-white dark:bg-gray-800 dark:hover:bg-gray-700"
-                        aria-label="Close"
-                        onClick={()=>dangerRef.current.classList.toggle("notification-transform")}
-                >
-                    <span className="sr-only">Close</span>
-                    <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
-                         viewBox="0 0 14 14">
-                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                              d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
-                    </svg>
-                </button>
-            </div>
-            <div id="toast-info"
-                 className="notification fixed bottom-5 right-5 flex items-center w-full max-w-xs p-4 text-gray-500 bg-white rounded-lg shadow dark:text-gray-400 dark:bg-gray-800"
-                 role="alert"
-                 ref={infoRef}
-            >
+            }
+
+            {
+                infoFlag &&
                 <div
-                    className="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-orange-500 bg-orange-100 rounded-lg dark:bg-orange-700 dark:text-orange-200">
-                    <svg className="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor"
-                         viewBox="0 0 20 20">
-                        <path
-                            d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM10 15a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-4a1 1 0 0 1-2 0V6a1 1 0 0 1 2 0v5Z"/>
-                    </svg>
-                    <span className="sr-only">Warning icon</span>
+                    id={"info-toast"}
+                    className="hs-removing:translate-x-5 hs-removing:opacity-0 transition duration-300 fixed bottom-5 right-5 w-[18rem] bg-yellow-100 border border-yellow-200 text-sm text-yellow-800 rounded-lg dark:bg-yellow-800/10 dark:border-yellow-900 dark:text-yellow-500"
+                    role="alert">
+                    <div className="flex p-4">
+                        {infoText}
+                        <div className="ms-auto">
+                            <button
+                                data-hs-remove-element="#info-toast"
+                                type="button"
+                                className="inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-yellow-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-yellow-200">
+                                <span className="sr-only">Close</span>
+                                <svg className="flex-shrink-0 w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24"
+                                     height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                                     strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18 6 6 18"/>
+                                    <path d="m6 6 12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div className="ml-3 text-sm font-normal">{infoText}</div>
-                <button type="button"
-                        className="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex items-center justify-center h-8 w-8 dark:text-gray-500 dark:hover:text-white dark:bg-gray-800 dark:hover:bg-gray-700"
-                        aria-label="Close"
-                        onClick={()=>infoRef.current.classList.toggle("notification-transform")}
-                >
-                    <span className="sr-only">Close</span>
-                    <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
-                         viewBox="0 0 14 14">
-                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                              d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
-                    </svg>
-                </button>
-            </div>
+
+            }
+
+
+            {
+                dangerFlag &&
+                <div
+                    id={"danger-toast"}
+                    className="hs-removing:translate-x-5 hs-removing:opacity-0 transition duration-300 fixed bottom-5 right-5 w-[18rem] bg-red-100 border border-red-200 text-sm text-red-800 rounded-lg dark:bg-red-800/10 dark:border-red-900 dark:text-red-500"
+                    role="alert">
+                    <div className="flex p-4">
+                        {dangerText}
+                        <div className="ms-auto">
+                            <button
+                                data-hs-remove-element="#danger-toast"
+                                type="button"
+                                className="inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-red-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-red-200">
+                                <span className="sr-only">Close</span>
+                                <svg className="flex-shrink-0 w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24"
+                                     height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                                     strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18 6 6 18"/>
+                                    <path d="m6 6 12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+
+
+
+
+
+
+
 
         </BrowserRouter>
 
