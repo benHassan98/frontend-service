@@ -1,5 +1,5 @@
 import {useState, useEffect, useContext, useRef} from "react";
-import {useNavigate} from "react-router-dom";
+import {useNavigate, Link} from "react-router-dom";
 import {BlobServiceClient} from "@azure/storage-blob";
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 import {useCookies} from "react-cookie";
@@ -16,7 +16,7 @@ import Comment from "./Comment.jsx";
 import axios from "axios";
 import { v4 as uuidv4 } from 'uuid';
 
-function Post({postProp, id, account, withCommentAccordion = true, fetchAccount, setPostsArr, setSuccessToast, setDangerToast}){
+function Post({postProp, id, account, withCommentAccordion, fetchAccount, setPostsArr, setSuccessToast, setDangerToast}){
 
     const [post, setPost] = useState({});
     const [postAccount, setPostAccount] = useState({});
@@ -258,6 +258,9 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                     const data =  res.data;
                     setPostStates(data);
                     setSuccessToast("Post Edited Successfully");
+
+                    editPostEditor.commands.clearContent();
+                    setEditPostContent("");
                     setUpdatePostImageList([]);
 
                 }
@@ -380,6 +383,13 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
         }).then( async (res)=>{
                 if(res.status === 200){
                     setSuccessToast("Post Shared just Now");
+
+
+
+                    publicSharedPostEditor.commands.clearContent();
+                    privateSharedPostEditor.commands.clearContent();
+                    setPublicSharedContent("");
+                    setPrivateSharedContent("");
                     setPublicSharedPostImageList([]);
                     setPrivateSharedPostImageList([]);
                 }
@@ -505,6 +515,8 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                         content:newContent
                     }]);
 
+                    commentEditor.commands.clearContent();
+                    setCommentContent("");
                     setNewCommentImageList([]);
                 }
 
@@ -796,7 +808,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                     <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
                          src={postAccount.picture}
                          alt="avatar"/>
-                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link">{postAccount.userName}</a>
+                    <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link" to={"/profile/"+postAccount.id}>{postAccount.userName}</Link>
                     <span
                         className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">
                         {post.sharedFromPost?"shared":"posted"} {Boolean(post.createdDate) && <TimeAgo date={Date.parse(post.createdDate)}/>}
@@ -954,8 +966,8 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                     <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
                                          src={currVal.postAccount.picture}
                                          alt="avatar"/>
-                                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0"
-                                       role="link">{currVal.postAccount.userName}</a>
+                                    <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0"
+                                       role="link" to={"/profile/"+currVal.postAccount.id}>{currVal.postAccount.userName}</Link>
                                     {
                                         !currVal.isDeleted &&
                                         <>
@@ -1025,10 +1037,10 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                         <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
                                                              src={likeAccount.picture}
                                                              alt="avatar"/>
-                                                        <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200 transition-colors duration-300 transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md  px-3 py-2"
-                                                           tabIndex="0" role="link">
+                                                        <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200 transition-colors duration-300 transform hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md  px-3 py-2"
+                                                           tabIndex="0" role="link" to={"/profile/"+likeAccount.id}>
                                                             {likeAccount.userName}
-                                                        </a>
+                                                        </Link>
                                                     </div>
                                                 );
 
@@ -1043,7 +1055,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                     </div>
 
 
-                    <p className={(withCommentAccordion&&"hs-accordion-toggle cursor-pointer")+"  text-white"}>
+                    <p className={(withCommentAccordion?"hs-accordion-toggle cursor-pointer":"")+"  text-white"}>
                         {commentsArr.length>0?commentsArr.length>1?`${commentsArr.length} Comments`:`${commentsArr.length} Comment`:"No Comments"}
                     </p>
 
@@ -1164,7 +1176,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                     <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
                                                          src={postAccount.picture}
                                                          alt="avatar"/>
-                                                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link">{postAccount.userName}</a>
+                                                    <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link" to={"/profile/"+postAccount.id}>{postAccount.userName}</Link>
                                                     <span
                                                         className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">
                                             {post.sharedFromPost?"shared":"posted"} {Boolean(post.createdDate) && <TimeAgo date={Date.parse(post.createdDate)}/>}
@@ -1205,8 +1217,8 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                                     <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
                                                                          src={currVal.postAccount.picture}
                                                                          alt="avatar"/>
-                                                                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0"
-                                                                       role="link">{currVal.postAccount.userName}</a>
+                                                                    <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0"
+                                                                       role="link" to={"/profile/"+currVal.postAccount.id}>{currVal.postAccount.userName}</Link>
                                                                     <span
                                                                         className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">
                         {currVal.isShared?"shared":"posted"} {Boolean(currVal.currPost.createdDate) && <TimeAgo date={Date.parse(currVal.currPost.createdDate)}/>}
@@ -1336,8 +1348,8 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                                     className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
                                                                     src={friend.picture}
                                                                     alt="avatar"/>
-                                                                <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
-                                                                   tabIndex="0" role="link">{friend.userName}</a>
+                                                                <p className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
+                                                                   tabIndex="0">{friend.userName}</p>
 
 
                                                             </div>
@@ -1356,8 +1368,8 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                             <div
                                                 onClick={()=>setIsVisibleToFollowers(prevState => !prevState)}
                                                 className={(isVisibleToFollowers?"bg-gray-600":"hover:bg-gray-600")+" cursor-pointer flex items-center gap-2 mb-2 transition-colors duration-300 transform rounded-md p-2"}>
-                                                <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
-                                                   tabIndex="0" role="link">Followers</a>
+                                                <p className="font-bold text-gray-700 cursor-pointer dark:text-gray-200"
+                                                   tabIndex="0" role="link">Followers</p>
                                             </div>
 
 
@@ -1367,7 +1379,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                     <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
                                                          src={postAccount.picture}
                                                          alt="avatar"/>
-                                                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link">{postAccount.userName}</a>
+                                                    <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link" to={"/profile/"+postAccount.id}>{postAccount.userName}</Link>
                                                     <span
                                                         className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">
                                             {post.sharedFromPost?"shared":"posted"} {Boolean(post.createdDate) && <TimeAgo date={Date.parse(post.createdDate)}/>}
@@ -1408,8 +1420,8 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
                                                                     <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
                                                                          src={currVal.postAccount.picture}
                                                                          alt="avatar"/>
-                                                                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0"
-                                                                       role="link">{currVal.postAccount.userName}</a>
+                                                                    <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0"
+                                                                       role="link" to={"/profile/"+currVal.postAccount.id}>{currVal.postAccount.userName}</Link>
                                                                     <span
                                                                         className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">
                         {currVal.isShared?"shared":"posted"} {Boolean(currVal.currPost.createdDate) && <TimeAgo date={Date.parse(currVal.currPost.createdDate)}/>}
@@ -1444,7 +1456,7 @@ function Post({postProp, id, account, withCommentAccordion = true, fetchAccount,
 
 
                         <button
-                            className={"px-3 py-2 mx-1 mt-2 text-gray-700 transition-colors duration-300 transform rounded-md lg:mt-0 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex-1 "+(withCommentAccordion&&"hs-accordion-toggle")}>Comment
+                            className={"px-3 py-2 mx-1 mt-2 text-gray-700 transition-colors duration-300 transform rounded-md lg:mt-0 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex-1 "+(withCommentAccordion?"hs-accordion-toggle":"")}>Comment
                         </button>
                     </div>
 

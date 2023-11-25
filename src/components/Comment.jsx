@@ -132,7 +132,7 @@ return(
                 <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
                      src={comment.account?.picture}
                      alt="avatar"/>
-                    <a className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link">{comment.account?.userName}</a>
+                    <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link" to={"profile/"+comment.account?.userName}>{comment.account?.userName}</Link>
                     <span
                         className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">commented {Boolean(comment.createdDate) && <TimeAgo date={Date.parse(comment.createdDate)}  />}</span>
 

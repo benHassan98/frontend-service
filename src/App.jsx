@@ -14,7 +14,9 @@ import EmailForm from "./components/EmailForm.jsx";
 import Test from "./components/Test.jsx";
 import PostPage from "./components/PostPage.jsx";
 import {BlobServiceClient} from "@azure/storage-blob";
-
+import Profile from "./components/Profile.jsx";
+import SockJS from "sockjs-client";
+import {Stomp} from "@stomp/stompjs";
 function App() {
     const [account,setAccount] = useState(null);
     const [accessToken, setAccessToken] = useState("");
@@ -27,7 +29,7 @@ function App() {
 
     const [,,removeCookie] = useCookies();
 
-
+    const [stompClient, setStompClient] = useState(null);
 
     const fetchAccount = async (id)=>{
         const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
@@ -99,7 +101,28 @@ function App() {
         }
 
     };
+    const setupSTOMP = (id)=>{
 
+        let socket = new SockJS(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/notifications/websocket");
+        let stompClient = Stomp.over(socket);
+        stompClient.connect({}, function (frame) {
+
+            console.log('Connected: ' + frame);
+
+            stompClient.subscribe(`/queue/notifications.${id}`,(req)=>{
+                const reqBody = JSON.parse(req);
+
+                console.log(reqBody);
+
+
+
+            });
+
+
+        });
+
+        setStompClient(stompClient);
+        };
 
     const toastsClear = ()=>{
         setSuccessFlag(false);
@@ -130,7 +153,7 @@ function App() {
     useEffect(()=>{
          fetchAccount(1)
              .then( (res)=>{
-
+                 setupSTOMP(res.id);
                  setAccount({
                      ...res
                  });
@@ -153,6 +176,7 @@ function App() {
               <Route path={"/signup"} element={<SignUp setInfoToast={setInfoToast} />}/>
               <Route path={"/login"} element={<Login setAccount={setAccount} setInfoToast={setInfoToast}  />}/>
               <Route path={"/post/:id"} element={<PostPage account={account} fetchAccount={fetchAccount} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast} />}/>
+              <Route path={"/profile/:id"} element={<Profile account={account} setAccount={setAccount} fetchAccount={fetchAccount} notificationStompClient={stompClient} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast} />}/>
               <Route path={"/settings"} element={<Settings account={account} setSuccessToast={setSuccessToast} setInfoToast={setInfoToast} setDangerToast={setDangerToast} />}/>
               <Route path={"/redirect"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
               <Route path={"/resetPassword"} element={<NewPasswordForm setSuccessToast={setSuccessToast}/>}/>
