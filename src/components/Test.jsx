@@ -11,6 +11,7 @@ import ReactDOMServer from 'react-dom/server';
 import TimeAgo from 'react-timeago';
 // import ContentEditable from "react-contenteditable";
 // import { Editor } from "react-draft-wysiwyg";
+import {Tooltip, Modal, Accordion} from 'flowbite-react';
 import {EditorState} from "draft-js";
 import "react-draft-wysiwyg/dist/react-draft-wysiwyg.css";
 import AtomicBlockUtils from "draft-js/lib/AtomicBlockUtils.js";
@@ -57,6 +58,7 @@ function Test(){
         }),
 
     ];
+
     const editor = useEditor({
         extensions,
         editorProps:{
@@ -85,6 +87,8 @@ function Test(){
     const navigate = useNavigate();
     const [editorState, setEditorState] = useState(EditorState.createEmpty());
     const [testState, setTestState] = useState();
+    const [showModal, setShowModal] = useState(false);
+    const [showPanel, setShowPanel] = useState(false);
     const handleChange = (e)=>{
         testRef.current = e.target.value;
     };
@@ -208,9 +212,53 @@ function Test(){
     //
     //
     // },[]);
+    const tooltipContent = <div role="tooltip"
+                                className="absolute invisible z-10 inline-block w-64 text-sm text-gray-500 transition-opacity duration-300 bg-white border border-gray-200 rounded-lg shadow-sm opacity-0 dark:text-gray-400 dark:border-gray-600 dark:bg-gray-800">
 
+        <div
+            className="px-3 py-2 bg-gray-100 border-b border-gray-200 rounded-t-lg dark:border-gray-600 dark:bg-gray-700">
+            <h3 className="font-semibold text-gray-900 dark:text-white">Post</h3>
+        </div>
 
+        <div className="px-3 py-2 flex flex-col gap-1">
+            <div
+                className="cursor-pointer transition-colors duration-300 transform rounded-md hover:bg-gray-700 p-1"
+            >
+                <p>In your profile</p>
+            </div>
 
+            <div
+                className="cursor-pointer transition-colors duration-300 transform rounded-md hover:bg-gray-700 p-1"
+                data-hs-overlay="#postModal"
+            >
+                <p>With your friends</p>
+            </div>
+
+        </div>
+        <div data-popper-arrow={true}></div>
+    </div>;
+
+    const tooltipContent2 = <div className={"w-64 text-sm text-gray-400 bg-gray-800 border border-gray-600 rounded-lg shadow-sm"}>
+        <div
+            className="px-3 py-2 bg-gray-700 border-b border-gray-600 rounded-t-lg">
+            <h3 className="font-semibold text-white">Post</h3>
+        </div>
+        <div className="px-3 py-2 flex flex-col gap-1">
+        <div
+            className="cursor-pointer transition-colors duration-300 transform rounded-md hover:bg-gray-700 p-1"
+        >
+            <p>In your profile</p>
+        </div>
+
+        <div
+            className="cursor-pointer transition-colors duration-300 transform rounded-md hover:bg-gray-700 p-1"
+            data-hs-overlay="#postModal"
+        >
+            <p>With your friends</p>
+        </div>
+
+    </div>
+        </div>;
 
     return (
         <>
@@ -518,7 +566,61 @@ function Test(){
             {/*<button onClick={()=>{*/}
             {/*    console.log(editorState.getCurrentContent().getAllEntities());*/}
             {/*}}>convert</button>*/}
-            <TimeAgo date={Date.now()} minPeriod={60}/>
+            <Tooltip content={tooltipContent2} placement={"bottom"} trigger={"click"} className={"m-0 p-0"}>
+                <button
+                        className="px-8 py-2.5 leading-5 text-white transition-colors duration-300 transform bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:bg-gray-600">Post
+                </button>
+            </Tooltip>
+
+            <button onClick={()=>setShowModal(true)}>Show Modal</button>
+            <Modal dismissible show={showModal} onClose={() => setShowModal(false)}>
+                <div
+                    className="overflow-x-hidden overflow-y-auto">
+                    <div className="flex flex-col border shadow-sm rounded-xl bg-gray-800 border-gray-700 shadow-slate-700/[.7]">
+                    <Modal.Header>
+
+                    </Modal.Header>
+                    <Modal.Body>
+                        <div className={"p-4 overflow-y-auto"}>
+                        <div className="p-6 space-y-6">
+
+
+                        </div>
+                        </div>
+                    </Modal.Body>
+
+
+
+                    </div>
+
+                </div>
+            </Modal>
+
+<button onClick={()=>setShowPanel(prevState => !prevState)}>ShowPanel</button>
+            <Accordion >
+                <Accordion.Panel isOpen={showPanel}>
+                    <Accordion.Title>What is Flowbite?</Accordion.Title>
+                    <Accordion.Content>
+                        <p className="mb-2 text-gray-500 dark:text-gray-400">
+                            Flowbite is an open-source library of interactive components built on top of Tailwind CSS including buttons,
+                            dropdowns, modals, navbars, and more.
+                        </p>
+                        <p className="text-gray-500 dark:text-gray-400">
+                            Check out this guide to learn how to&nbsp;
+                            <a
+                                href="https://flowbite.com/docs/getting-started/introduction/"
+                                className="text-cyan-600 hover:underline dark:text-cyan-500"
+                            >
+                                get started&nbsp;
+                            </a>
+                            and start developing websites even faster with components on top of Tailwind CSS.
+                        </p>
+                    </Accordion.Content>
+                </Accordion.Panel>
+
+
+            </Accordion>
+
 
 
 

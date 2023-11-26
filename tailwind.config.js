@@ -1,11 +1,12 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ["./index.html","./src/**/*.{js,jsx,ts,tsx}",'./node_modules/preline/dist/*.js'],
+  content: ["./index.html","./src/**/*.{js,jsx,ts,tsx}",'./node_modules/preline/dist/*.js','node_modules/flowbite-react/lib/esm/**/*.js'],
   theme: {
     extend: {},
   },
   plugins: [
-    require('preline/plugin')
+    require('preline/plugin'),
+     require('flowbite/plugin')
   ],
 }
 

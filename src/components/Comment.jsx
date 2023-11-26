@@ -7,7 +7,7 @@ import sanitizeHtml from "sanitize-html";
 import parse from "html-react-parser";
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 import {useCookies} from "react-cookie";
-import {useNavigate} from "react-router-dom";
+import {Link, useNavigate} from "react-router-dom";
 import TimeAgo from "react-timeago";
 function Comment({propComment, fetchAccount, setCommentsArr, containerClient, showDelete}){
 
@@ -132,7 +132,7 @@ return(
                 <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block"
                      src={comment.account?.picture}
                      alt="avatar"/>
-                    <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link" to={"profile/"+comment.account?.userName}>{comment.account?.userName}</Link>
+                    <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link" to={"profile/"+comment.account?.id}>{comment.account?.userName}</Link>
                     <span
                         className="text-sm font-light text-gray-600 dark:text-gray-400 mx-2">commented {Boolean(comment.createdDate) && <TimeAgo date={Date.parse(comment.createdDate)}  />}</span>
 

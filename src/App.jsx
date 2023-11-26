@@ -52,10 +52,13 @@ function App() {
                 const blob = await blobClient.download();
                 const blobBody = await blob.blobBody;
 
+                const accountUrl = accountRes.picture;
                 accountRes.picture = URL.createObjectURL(blobBody);
+                accountRes.url = accountUrl;
 
                 for(let i = 0; i< accountRes.friendList.length;i++){
                     const friend = accountRes.friendList[i];
+                    const friendUrl = friend.picture;
 
                     const friendBlobClient = containerClient.getBlobClient(friend.picture);
                     const friendBlob = await friendBlobClient.download();
@@ -63,6 +66,7 @@ function App() {
 
 
                     accountRes.friendList[i].picture = URL.createObjectURL(friendBlobBody);
+                    accountRes.friendList[i].url = friendUrl;
 
                 }
 
@@ -110,7 +114,7 @@ function App() {
             console.log('Connected: ' + frame);
 
             stompClient.subscribe(`/queue/notifications.${id}`,(req)=>{
-                const reqBody = JSON.parse(req);
+                const reqBody = JSON.parse(req.body);
 
                 console.log(reqBody);
 
@@ -160,6 +164,11 @@ function App() {
 
              })
              .catch(err=>console.error(err));
+
+         return ()=>{
+             stompClient.disconnect();
+             setStompClient(null);
+         };
 
     },[]);
 
