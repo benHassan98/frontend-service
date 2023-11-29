@@ -22,7 +22,6 @@ function Post({
                   postProp,
                   id,
                   account,
-                  withCommentAccordion,
                   fetchAccount,
                   setPostsArr,
                   setSuccessToast,
@@ -319,7 +318,7 @@ function Post({
         const friendsArr = [];
         let selectedCnt = 0;
 
-        friendsRef.current.childNodes.forEach(node => {
+        friendsRef.current?.childNodes.forEach(node => {
 
             const isSelected = node.classList.contains("bg-gray-600");
             const username = node.lastChild.textContent;
@@ -892,7 +891,7 @@ function Post({
                                                                onChange={(e) => {
                                                                    const newImage = e.target.files[0];
                                                                    const newImageUrl = URL.createObjectURL(newImage);
-                                                                   const newImageId = uuid4();
+                                                                   const newImageId = uuidv4();
 
                                                                    editPostEditor.commands
                                                                        .setContent(
@@ -1120,7 +1119,7 @@ function Post({
                                                            onChange={(e) => {
                                                                const newImage = e.target.files[0];
                                                                const newImageUrl = URL.createObjectURL(newImage);
-                                                               const newImageId = uuid4();
+                                                               const newImageId = uuidv4();
 
                                                                publicSharedPostEditor.commands
                                                                    .setContent(
@@ -1268,7 +1267,7 @@ function Post({
                                                            onChange={(e) => {
                                                                const newImage = e.target.files[0];
                                                                const newImageUrl = URL.createObjectURL(newImage);
-                                                               const newImageId = uuid4();
+                                                               const newImageId = uuidv4();
 
                                                                privateSharedPostEditor.commands
                                                                    .setContent(
@@ -1481,7 +1480,7 @@ function Post({
                                onChange={(e) => {
                                    const newImage = e.target.files[0];
                                    const newImageUrl = URL.createObjectURL(newImage);
-                                   const newImageId = uuid4();
+                                   const newImageId = uuidv4();
 
 
                                    commentEditor.commands

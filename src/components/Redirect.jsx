@@ -1,22 +1,21 @@
-import {useLocation, useNavigate} from "react-router-dom";
+import {useNavigate, useSearchParams} from "react-router-dom";
 import {useCookies} from "react-cookie";
-import {useEffect} from "react";
+import {useContext, useEffect} from "react";
+import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 
 function Redirect({setDangerToast,setSuccessToast}){
-    const [cookies] = useCookies(["XSRF-TOKEN"]);
+    const [, , removeCookie] = useCookies();
     const navigate = useNavigate();
-    const {search} = useLocation();
-    const params = new URLSearchParams(search);
-    const code = params.get("verifyAccount") || params.get("resetPassword");
+    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
+    const [params,] = useSearchParams();
+    const code = params.get("token");
 
-
-    useEffect(()=>{
-
-        fetch(import.meta.env.VITE_API_URL+"/token/verify",{
+    const redirectRequest = ()=>{
+        fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/token/verify",{
             method:"POST",
             headers:{
                 "Content-Type": "application/json",
-                "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
+                "Authorization": `Bearer  ${accessToken}`
             },
             body:JSON.stringify({
                 code
@@ -24,11 +23,6 @@ function Redirect({setDangerToast,setSuccessToast}){
             credentials:"include",
         })
             .then(async (res)=>{
-                const isJson = res.headers
-                    .get("content-type")
-                    .includes("application/json");
-
-                const data = isJson ? await res.json() : null;
                 if(res.status === 500){
                     return Promise.reject(500);
                 }
@@ -36,34 +30,66 @@ function Redirect({setDangerToast,setSuccessToast}){
                     setDangerToast("Token is expired");
                     navigate("/");
                 }
-                else{
-                    const {token} = data;
-                   if(token.type === "resetPassword"){
-                       navigate("/resetPassword",{
-                           state:{
-                               accountEmail:token.accountEmail,
-                           }
-                       });
-                   }
-                    fetch(import.meta.env.VITE_API_URL+"/account/verify",{
-                        method:"POST",
-                        headers:{
+                else if(res.status === 401){
+                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
+                        method: "GET",
+                        headers: {
                             "Content-Type": "application/json",
-                            "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
                         },
-                        body:JSON.stringify({
-                            email:token.accountEmail,
-                        }),
-                        credentials:"include",
+                        credentials: "include"
                     })
-                        .then(res=>{
-                            if(res.status === 500){
-                                return Promise.reject(500);
+                        .then(async (res) => {
+                            if (res.status === 200) {
+                                const data = await res.json();
+                                setAccessToken(data.access_token);
+                                redirectRequest();
+                            } else {
+                                removeCookie("refresh_token");
+                                removeCookie("JSESSIONID");
+                                setAccessToken(null);
+                                navigate("/login");
                             }
-                            setSuccessToast("Email Verified");
-                            navigate("/");
+
                         })
-                        .catch(err=>console.error(err));
+                        .catch(err => console.error(err));
+                }
+                else{
+                    const token = await res.json();
+                    if(token.type === "resetPassword"){
+                        navigate("/resetPassword",{
+                            state:{
+                                accountEmail:token.accountEmail,
+                            }
+                        });
+                    }
+                    else{
+
+                        fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/verify",{
+                            method:"POST",
+                            headers:{
+                                "Content-Type": "application/json",
+                                "Authorization": `Bearer  ${accessToken}`
+                            },
+                            body:JSON.stringify({
+                                email:token.accountEmail,
+                            }),
+                            credentials:"include",
+                        })
+                            .then(res=>{
+                                if(res.status === 500){
+                                    return Promise.reject(500);
+                                }
+                                else if(res.status === 200){
+                                    setSuccessToast("Email Verified");
+                                    navigate("/");
+                                }
+                                else {
+                                    throw new Error(res.statusText);
+                                }
+                            })
+                            .catch(err=>console.error(err));
+
+                    }
 
 
 
@@ -81,11 +107,19 @@ function Redirect({setDangerToast,setSuccessToast}){
 
 
 
+    };
+
+
+    useEffect(()=>{
+        if(code){
+            redirectRequest();
+        }
+
+
     },[]);
 
     return(
         <>
-        This is Redirect
         </>
     );
 }

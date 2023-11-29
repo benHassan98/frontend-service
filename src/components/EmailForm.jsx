@@ -1,18 +1,20 @@
-import {useRef} from "react";
+import {useContext, useRef} from "react";
 import {useNavigate} from "react-router-dom";
 import {useCookies} from "react-cookie";
+import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 
-function EmailForm(){
+function EmailForm({setInfoToast, setDangerToast}){
     const emailRef = useRef();
+    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
+    const [, , removeCookie] = useCookies();
     const navigate = useNavigate();
-    const [cookies] = useCookies(['XSRF-TOKEN']);
     const sendLinkRequest = (e)=>{
         e.preventDefault();
         const requestOptions = {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
+                "Authorization": `Bearer  ${accessToken}`
             },
             body:JSON.stringify({
                 accountEmail:emailRef.current.value,
@@ -22,19 +24,48 @@ function EmailForm(){
 
         };
 
-        fetch(import.meta.env.VITE_API_URL+"/token/create",requestOptions)
+        fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/token/create",requestOptions)
             .then(res=>{
-                if(res.status === 500){
-                    return Promise.reject(500);
+                if(res.status === 200){
+                    setInfoToast("Please check your inbox for confirmation");
+                    navigate("/");
                 }
-                navigate("/login");
+                else if(res.status === 401){
+                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
+                        method: "GET",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        credentials: "include"
+                    })
+                        .then(async (res) => {
+                            if (res.status === 200) {
+                                const data = await res.json();
+                                setAccessToken(data.access_token);
+                                sendLinkRequest();
+                            } else {
+                                removeCookie("refresh_token");
+                                removeCookie("JSESSIONID");
+                                setAccessToken(null);
+                                navigate("/login");
+                            }
+
+                        })
+                        .catch(err => console.error(err));
+
+                }
+                else{
+                    setDangerToast("An error has occurred please try again later");
+                    throw new Error(res.statusText);
+                }
             })
             .catch(err=>console.error(err));
+
 
     };
 
     return (
-        <div className="flex flex-col justify-center items-center w-screen h-screen">
+        <div className="flex flex-col justify-center items-center mt-[5rem]">
             <div className="w-full max-w-sm p-6 m-auto mx-auto bg-white rounded-lg shadow-md dark:bg-gray-800">
                 <div className="flex justify-center mx-auto">
                     <h1 className="text-white text-4xl">Odin Book</h1>

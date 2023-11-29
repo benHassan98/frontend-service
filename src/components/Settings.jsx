@@ -3,8 +3,9 @@ import axios from 'axios';
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 import {useCookies} from "react-cookie";
 import {useNavigate} from "react-router-dom";
+import {v4 as uuidv4} from 'uuid';
 
-function Settings({account, setSuccessToast,  setInfoToast, setDangerToast}){
+function Settings({account, fetchAccount, setAccount, setSuccessToast,  setInfoToast, setDangerToast}){
 
     const [image, setImage] = useState(null);
     const aboutMeRef = useRef();
@@ -73,15 +74,25 @@ function Settings({account, setSuccessToast,  setInfoToast, setDangerToast}){
 
         const formData = new FormData();
 
-        formData.append("aboutMe",aboutMeRef.current.value);
+        const newAccount = {
+            ...account,
+            aboutMe:aboutMeRef.current.value
+        };
+
+        Object.entries(newAccount).forEach(([k, v])=>{
+            formData.append(k,v);
+        });
 
         if(image.id){
-            formData.append("id",image.id);
-            formData.append("image",image.file);
+            formData.append("name",image.id);
+            formData.append("file",image.file);
         }
+        formData.delete("url");
+        formData.delete("image");
 
+        console.log("updateFormData: ",formData);
         axios({
-            method: 'POST',
+            method: 'PUT',
             url: import.meta.env.VITE_ACCOUNT_SERVICE+"/update",
             data: formData,
             headers: {
@@ -91,7 +102,11 @@ function Settings({account, setSuccessToast,  setInfoToast, setDangerToast}){
             withCredentials: true
         }).then(async (res) => {
             if (res.status === 200) {
-                setSuccessToast("Post Shared just Now");
+                const data = await fetchAccount(account.id);
+
+                setAccount({...data});
+                setSuccessToast("Account Updated");
+
 
             } else if (res.status === 401) {
                 fetch(import.meta.env.VITE_REFRESH_TOKEN, {
@@ -127,9 +142,12 @@ function Settings({account, setSuccessToast,  setInfoToast, setDangerToast}){
     };
 
     useEffect(()=>{
-        setImage({
-            url:account?.picture
-        });
+if(account){
+    setImage({
+        url:account.picture
+    });
+    aboutMeRef.current.textContent = account.aboutMe || "About Me";
+}
     },[account]);
 
 
@@ -188,7 +206,7 @@ function Settings({account, setSuccessToast,  setInfoToast, setDangerToast}){
                         <div className="ml-2">
 
                             <label htmlFor={"imageInput"}
-                                    className="text-gray-900 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-full px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700">
+                                    className="cursor-pointer text-gray-900 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-full px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700">
                                 Change
                             </label>
                             <input
@@ -198,7 +216,7 @@ function Settings({account, setSuccessToast,  setInfoToast, setDangerToast}){
                                 onChange={(e)=>{
                                     const newImage = e.target.files[0];
                                     const newImageUrl = URL.createObjectURL(newImage);
-                                    const newImageId = uuid4();
+                                    const newImageId = uuidv4();
 
                                     setImage({
                                         id:newImageId,
@@ -229,7 +247,6 @@ function Settings({account, setSuccessToast,  setInfoToast, setDangerToast}){
                     <textarea id="aboutMeText" rows="4"
                               className="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                               style={{resize:"none"}}
-                              value={account?.aboutMe || "About Me"}
                               ref={aboutMeRef}
 
                     ></textarea>

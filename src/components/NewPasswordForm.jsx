@@ -1,19 +1,21 @@
-import {useRef} from "react";
+import {useContext, useRef} from "react";
 import {useLocation, useNavigate} from "react-router-dom";
 import {useCookies} from "react-cookie";
+import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 
-function NewPasswordForm({setSuccessToast}){
+function NewPasswordForm({setSuccessToast, setDangerToast}){
     const passwordRef = useRef();
     const passwordErrRef = useRef();
     const passwordConfirmRef = useRef();
     const passwordConfirmErrRef = useRef();
     const navigate = useNavigate();
-    const [cookies] = useCookies(['XSRF-TOKEN']);
+    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
+    const [, , removeCookie] = useCookies();
     const location = useLocation();
     const resetPasswordRequest = (e)=>{
         e.preventDefault();
 
-        if(passwordRef.current.value.trim().length >=6 && passwordRef.current.value.trim().length <=40){
+        if(passwordRef.current.value.trim().length < 6 || passwordRef.current.value.trim().length > 40){
             passwordErrRef.current.textContent = "Size must be between 6 and 40";
             return;
         }
@@ -27,7 +29,7 @@ function NewPasswordForm({setSuccessToast}){
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
-                "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
+                "Authorization": `Bearer  ${accessToken}`
             },
             body:JSON.stringify({
                 email:location.state.accountEmail,
@@ -38,13 +40,40 @@ function NewPasswordForm({setSuccessToast}){
 
         };
 
-        fetch(import.meta.env.VITE_API_URL+"/account/resetPassword",requestOptions)
+        fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/resetPassword",requestOptions)
             .then(res=>{
-                if(res.status === 500){
-                    return Promise.reject(500);
+                if(res.status === 200){
+                    setSuccessToast("Password reset");
+                    navigate("/");
                 }
-                setSuccessToast("Password Reset");
-                navigate("/login");
+                else if(res.status === 401){
+                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
+                        method: "GET",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        credentials: "include"
+                    })
+                        .then(async (res) => {
+                            if (res.status === 200) {
+                                const data = await res.json();
+                                setAccessToken(data.access_token);
+                                resetPasswordRequest();
+                            } else {
+                                removeCookie("refresh_token");
+                                removeCookie("JSESSIONID");
+                                setAccessToken(null);
+                                navigate("/login");
+                            }
+
+                        })
+                        .catch(err => console.error(err));
+
+                }
+                else{
+                    setDangerToast("An error has occurred please try again later");
+                    throw new Error(res.statusText);
+                }
             })
             .catch(err=>console.error(err));
 

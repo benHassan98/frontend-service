@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react'
+import {useContext, useEffect, useState} from 'react'
 import SignUp from './components/SignUp.jsx';
 import Login from './components/Login.jsx';
 import Home from './components/Home.jsx';
@@ -17,17 +17,22 @@ import {BlobServiceClient} from "@azure/storage-blob";
 import Profile from "./components/Profile.jsx";
 import SockJS from "sockjs-client";
 import {Stomp} from "@stomp/stompjs";
+import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 function App() {
     const [account,setAccount] = useState(null);
-    const [accessToken, setAccessToken] = useState("");
+    const [notificationsArr, setNotificationsArr] = useState([]);
     const [successText,setSuccessText] = useState("");
     const [successFlag, setSuccessFlag] = useState(false);
     const [infoText,setInfoText] = useState("");
     const [infoFlag, setInfoFlag] = useState(false);
     const [dangerText,setDangerText] = useState("");
     const [dangerFlag, setDangerFlag] = useState(false);
+    const [notificationContent, setNotificationContent] = useState({});
+    const [notificationFlag, setNotificationFlag] = useState(false);
+
 
     const [,,removeCookie] = useCookies();
+    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
 
     const [stompClient, setStompClient] = useState(null);
 
@@ -105,6 +110,71 @@ function App() {
         }
 
     };
+    const fetchNotifications = async (id)=>{
+        try{
+            const res = await fetch(import.meta.env.VITE_NOTIFICATIONS_SERVICE+'/'+id,{
+                method:"GET",
+                headers:{
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer  ${accessToken}`
+                },
+                credentials:"include"
+            });
+
+            if(res.status === 200){
+                const data = await res.json();
+                const tempArr = [];
+
+                for(let i = 0;i<data.length;i++){
+                    const notificationAccount = await fetchAccount(data[i].accountId);
+                    const newNotification = {
+                        ...data[i],
+                        account:notificationAccount
+                    };
+
+                    tempArr.push(newNotification);
+
+                }
+
+                setNotificationsArr([...tempArr.reverse()]);
+
+            }
+
+            else if(res.status === 401){
+                const refRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN,{
+                    method:"GET",
+                    headers:{
+                        "Content-Type": "application/json",
+                    },
+                    credentials:"include"
+                });
+                if(refRes.status === 200){
+                    const data = await res.json();
+                    setAccessToken(data.access_token);
+                    fetchNotifications(id);
+                }
+                else{
+                    removeCookie("refresh_token");
+                    removeCookie("JSESSIONID");
+                    setAccessToken(null);
+                    setAccount(null);
+                }
+
+
+            }
+            else {
+                console.error(res.statusText);
+
+            }
+
+        }
+        catch (e){
+            console.error(e);
+        }
+
+
+
+    };
     const setupSTOMP = (id)=>{
 
         let socket = new SockJS(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/notifications/websocket");
@@ -113,11 +183,61 @@ function App() {
 
             console.log('Connected: ' + frame);
 
-            stompClient.subscribe(`/queue/notifications.${id}`,(req)=>{
+            stompClient.subscribe(`/queue/notifications.${id}`,async (req)=>{
                 const reqBody = JSON.parse(req.body);
 
-                console.log(reqBody);
+                console.log("notifications",reqBody);
 
+                const newNotificationContent = {...reqBody};
+
+                if(reqBody.type === 'AddFriendNotification'){
+
+                    const notificationAccount =  await fetchAccount(newNotificationContent.addingId);
+
+                    newNotificationContent.url = notificationAccount.picture;
+                    newNotificationContent.userName = notificationAccount.userName;
+                    newNotificationContent.text = 'sent you a friend request';
+
+                }
+                else if(reqBody.type === 'NewPostNotification'){
+
+                    const notificationAccount =  await fetchAccount(newNotificationContent.accountId);
+
+                    newNotificationContent.url = notificationAccount.picture;
+                    newNotificationContent.userName = notificationAccount.userName;
+                    newNotificationContent.text = (reqBody.created?"created ":"shared ")+'a new Post';
+
+
+                }
+                else if(reqBody.type === 'NewCommentNotification'){
+
+                    const notificationAccount =  await fetchAccount(newNotificationContent.accountId);
+
+                    newNotificationContent.url = notificationAccount.picture;
+                    newNotificationContent.userName = notificationAccount.userName;
+                    newNotificationContent.text = 'commented on your post';
+
+
+                }
+                else if(reqBody.type === 'NewLikeNotification'){
+
+                    const notificationAccount =  await fetchAccount(newNotificationContent.accountId);
+
+                    newNotificationContent.url = notificationAccount.picture;
+                    newNotificationContent.userName = notificationAccount.userName;
+                    newNotificationContent.text = 'Liked your post';
+
+
+                }
+                else{
+                    const notificationAccount =  await fetchAccount(newNotificationContent.accountId);
+
+                    newNotificationContent.url = notificationAccount.picture;
+                    newNotificationContent.userName = notificationAccount.userName;
+                    newNotificationContent.text = 'sent you a message';
+                }
+
+                setNotificationToast(newNotificationContent);
 
 
             });
@@ -128,11 +248,31 @@ function App() {
         setStompClient(stompClient);
         };
 
+    const respondToFriendRequest = (addingId, isAccepted)=>{
+        stompClient.send(
+            "/addFriend",
+            {},
+            JSON.stringify({
+                addingId,
+                addedId:account?.id,
+                isRequest:false,
+                isAccepted
+            }));
+
+    };
+
     const toastsClear = ()=>{
+        setNotificationFlag(false);
         setSuccessFlag(false);
         setInfoFlag(false);
         setDangerFlag(false);
     };
+
+    const setNotificationToast = (content)=>{
+        toastsClear();
+        setNotificationFlag(true);
+        setNotificationContent({...content});
+    }
 
     const setSuccessToast = (text)=>{
         toastsClear();
@@ -154,10 +294,14 @@ function App() {
 
     };
 
+
+
+
     useEffect(()=>{
          fetchAccount(1)
-             .then( (res)=>{
-                 setupSTOMP(res.id);
+             .then( async (res)=>{
+                 await fetchNotifications(res.id);
+                 await setupSTOMP(res.id);
                  setAccount({
                      ...res
                  });
@@ -166,7 +310,7 @@ function App() {
              .catch(err=>console.error(err));
 
          return ()=>{
-             stompClient.disconnect();
+             stompClient?.disconnect();
              setStompClient(null);
          };
 
@@ -178,20 +322,72 @@ function App() {
   return (
 
         <BrowserRouter>
-            <Navbar />
+            <Navbar account={account} setAccount={setAccount} notificationsArr={notificationsArr} respondToFriendRequest={respondToFriendRequest} />
           <Routes>
 
-              <Route path={"/"} element={<Home account={account}/>}/>
+              <Route path={"/"} element={<Home account={account} fetchAccount={fetchAccount} notificationStompClient={stompClient} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast}/>}/>
               <Route path={"/signup"} element={<SignUp setInfoToast={setInfoToast} />}/>
               <Route path={"/login"} element={<Login setAccount={setAccount} setInfoToast={setInfoToast}  />}/>
               <Route path={"/post/:id"} element={<PostPage account={account} fetchAccount={fetchAccount} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast} />}/>
               <Route path={"/profile/:id"} element={<Profile account={account} setAccount={setAccount} fetchAccount={fetchAccount} notificationStompClient={stompClient} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast} />}/>
-              <Route path={"/settings"} element={<Settings account={account} setSuccessToast={setSuccessToast} setInfoToast={setInfoToast} setDangerToast={setDangerToast} />}/>
-              <Route path={"/redirect"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
+              <Route path={"/settings"} element={<Settings account={account} fetchAccount={fetchAccount} setAccount={setAccount} setSuccessToast={setSuccessToast} setInfoToast={setInfoToast} setDangerToast={setDangerToast} />}/>
+              <Route path={"/redirect/:type"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
               <Route path={"/resetPassword"} element={<NewPasswordForm setSuccessToast={setSuccessToast}/>}/>
-              <Route path={"/forgetPassword"} element={<EmailForm/>}/>
-              <Route path={"/test"} element={<Test/>}/>
+              <Route path={"/forgetPassword"} element={<EmailForm setInfoToast={setInfoToast} setDangerToast={setDangerToast}  />}/>
+              <Route path={"/test/:type"} element={<Test/>}/>
           </Routes>
+
+            {
+                notificationFlag &&
+                <div id="notification-toast"
+                     className="hs-removing:translate-x-5 hs-removing:opacity-0 transition duration-300 fixed bottom-5 right-5 w-[18rem] bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700"
+                     role="alert">
+                    <div className="flex p-4">
+                        <div className="flex-shrink-0">
+                            <img className="inline-block h-10 w-10 rounded-full"
+                                 src={notificationContent.url}
+                                 alt="Image Description"/>
+                            <button
+                                    onClick={()=>toastsClear()}
+                                    data-hs-remove-element='#notification-toast' type="button"
+                                    className="absolute top-3 end-3 inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-gray-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-white">
+                                <span className="sr-only">Close</span>
+                                <svg className="flex-shrink-0 w-4 h-4" xmlns="http://www.w3.org/2000/svg"
+                                     viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                                     strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18 6 6 18"/>
+                                    <path d="m6 6 12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div className={"ms-4 me-5"} >
+                            <h3 className="text-gray-800 font-medium text-sm dark:text-white">
+                                <span className="font-semibold">{notificationContent.userName}</span> {notificationContent.text}
+                            </h3>
+                            {
+                                Boolean(notificationContent.type === "AddFriendNotification") &&
+                                <div className="flex space-x-3 mt-1">
+                                    <button
+                                        onClick={()=>respondToFriendRequest(notificationContent.addingId, true)}
+                                        type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
+                                        Accept
+                                    </button>
+                                    <button
+                                        onClick={()=>respondToFriendRequest(notificationContent.addingId, false)}
+                                        type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
+                                        Reject
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+
+            }
+
+
+
 
             {
                 successFlag &&
@@ -203,6 +399,7 @@ function App() {
                         {successText}
                         <div className="ms-auto">
                             <button
+                                onClick={()=>toastsClear()}
                                 data-hs-remove-element="#success-toast"
                                 type="button"
                                 className="inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-teal-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-teal-200">
@@ -229,6 +426,7 @@ function App() {
                         {infoText}
                         <div className="ms-auto">
                             <button
+                                onClick={()=>toastsClear()}
                                 data-hs-remove-element="#info-toast"
                                 type="button"
                                 className="inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-yellow-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-yellow-200">
@@ -257,6 +455,7 @@ function App() {
                         {dangerText}
                         <div className="ms-auto">
                             <button
+                                onClick={()=>toastsClear()}
                                 data-hs-remove-element="#danger-toast"
                                 type="button"
                                 className="inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-red-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-red-200">

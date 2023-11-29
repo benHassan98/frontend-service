@@ -16,9 +16,9 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
 
     const {id} = useParams();
     const [profileAccount, setProfileAccount] = useState(null);
+    const [postsArr, setPostsArr] = useState([]);
     const [newPostContent, setNewPostContent] = useState("");
     const [newPostImageList, setNewPostImageList] = useState([]);
-    const [postsArr, setPostsArr] = useState([]);
     const [isVisibleToFollowers, setIsVisibleToFollowers] = useState(false);
 
 
@@ -89,7 +89,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
         const friendsArr = [];
         let selectedCnt = 0;
 
-        friendsRef.current.childNodes.forEach(node=>{
+        friendsRef.current?.childNodes.forEach(node=>{
 
             const isSelected = node.classList.contains("bg-gray-600");
             const username = node.lastChild.textContent;
@@ -157,7 +157,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
 
                 if(res.status === 200){
                     const data = res.data;
-
+//public or private
                     if(data.visibleToFollowers&& !data.friendsVisibilityType){
                         setPostsArr(prevState => [data,...prevState]);
                     }
@@ -215,7 +215,8 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             JSON.stringify({
                 addingId:account?.id,
                 addedId:profileAccount?.id,
-                isRequest:true
+                isRequest:true,
+                isAccepted:false
             }));
 
 

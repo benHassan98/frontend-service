@@ -4,7 +4,7 @@ import sanitizeHtml from "sanitize-html"
 // import {Stomp} from "@stomp/stompjs";
 // import qs from 'qs';
 import {useCookies} from "react-cookie";
-import {useNavigate, useResolvedPath, useSearchParams} from "react-router-dom";
+import {useNavigate, useParams, useResolvedPath, useSearchParams} from "react-router-dom";
 import parse from 'html-react-parser';
 // import axios from "axios";
 import ReactDOMServer from 'react-dom/server';
@@ -74,7 +74,8 @@ function Test(){
 
     });
 
-
+    const {type} = useParams();
+    const [params,] = useSearchParams();
     const editorContent = '<p>Hello World!</p>'
     const [content, setContent] = useState("");
     const [filesList, setFilesList] = useState([]);
@@ -259,6 +260,8 @@ function Test(){
 
     </div>
         </div>;
+
+    console.log("type:  ",type,params.get('token'));
 
     return (
         <>
@@ -572,56 +575,70 @@ function Test(){
                 </button>
             </Tooltip>
 
-            <button onClick={()=>setShowModal(true)}>Show Modal</button>
-            <Modal dismissible show={showModal} onClose={() => setShowModal(false)}>
-                <div
-                    className="overflow-x-hidden overflow-y-auto">
-                    <div className="flex flex-col border shadow-sm rounded-xl bg-gray-800 border-gray-700 shadow-slate-700/[.7]">
-                    <Modal.Header>
-
-                    </Modal.Header>
-                    <Modal.Body>
-                        <div className={"p-4 overflow-y-auto"}>
-                        <div className="p-6 space-y-6">
-
-
-                        </div>
-                        </div>
-                    </Modal.Body>
 
 
 
+            <div className="max-w-xs bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700" role="alert">
+                <div className="flex p-4">
+                    <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-gray-600 mt-1 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
                     </div>
-
+                    <div className="ms-4">
+                        <h3 className="text-gray-800 font-semibold dark:text-white">
+                            App notifications
+                        </h3>
+                        <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                            Notifications may include alerts, sounds and icon badges.
+                        </div>
+                        <div className="mt-4">
+                            <div className="flex space-x-3">
+                                <button type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
+                                    Accept
+                                </button>
+                                <button type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
+                                    Reject
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </Modal>
+            </div>
 
-<button onClick={()=>setShowPanel(prevState => !prevState)}>ShowPanel</button>
-            <Accordion >
-                <Accordion.Panel isOpen={showPanel}>
-                    <Accordion.Title>What is Flowbite?</Accordion.Title>
-                    <Accordion.Content>
-                        <p className="mb-2 text-gray-500 dark:text-gray-400">
-                            Flowbite is an open-source library of interactive components built on top of Tailwind CSS including buttons,
-                            dropdowns, modals, navbars, and more.
-                        </p>
-                        <p className="text-gray-500 dark:text-gray-400">
-                            Check out this guide to learn how to&nbsp;
-                            <a
-                                href="https://flowbite.com/docs/getting-started/introduction/"
-                                className="text-cyan-600 hover:underline dark:text-cyan-500"
-                            >
-                                get started&nbsp;
-                            </a>
-                            and start developing websites even faster with components on top of Tailwind CSS.
-                        </p>
-                    </Accordion.Content>
-                </Accordion.Panel>
-
-
-            </Accordion>
-
-
+            <div id="notification-toast"
+                 className="hs-removing:translate-x-5 hs-removing:opacity-0 transition duration-300 fixed bottom-5 right-5 w-[18rem] bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700"
+                 role="alert">
+                <div className="flex p-4">
+                    <div className="flex-shrink-0">
+                        <img className="inline-block h-10 w-10 rounded-full"
+                             src={"https://images.unsplash.com/photo-1568602471122-7832951cc4c5?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80"}
+                             alt="Image Description"/>
+                        <button
+                            data-hs-remove-element='#notification-toast' type="button"
+                            className="absolute top-3 end-3 inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-gray-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-white">
+                            <span className="sr-only">Close</span>
+                            <svg className="flex-shrink-0 w-4 h-4" xmlns="http://www.w3.org/2000/svg"
+                                 viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                                 strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M18 6 6 18"/>
+                                <path d="m6 6 12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div className="ms-4 me-5">
+                        <h3 className="text-gray-800 font-medium text-sm dark:text-white">
+                            <span className="font-semibold">James</span>sent u a friend request
+                        </h3>
+                        <div className="flex space-x-3 mt-1">
+                            <button type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
+                                Accept
+                            </button>
+                            <button type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
+                                Reject
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
 
 

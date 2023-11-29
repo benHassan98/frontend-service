@@ -1,6 +1,20 @@
-import React from 'react';
-import {Link} from 'react-router-dom';
-function Navbar({account}) {
+import React, {useContext} from 'react';
+import {Link, useNavigate} from 'react-router-dom';
+import TimeAgo from 'react-timeago';
+import {useCookies} from "react-cookie";
+import {AccessTokenContext} from "./AccessTokenProvider.jsx";
+function Navbar({account, setAccount, notificationsArr, respondToFriendRequest}) {
+
+    const navigate = useNavigate();
+    const [,,removeCookie] = useCookies();
+    const {setAccessToken} = useContext(AccessTokenContext);
+    const signOut = ()=>{
+
+        removeCookie("refresh_token");
+        removeCookie("JSESSIONID");
+        setAccessToken(null);
+        setAccount(null);
+    }
 
     return(
 // <div className="flex flex-col">
@@ -14,7 +28,7 @@ function Navbar({account}) {
 
 
                     </div>
-                    { account &&
+                    { Boolean(account) &&
 
                         <div
                             className="absolute inset-x-0 z-20 w-full px-6 py-4 transition-all duration-300 ease-in-out bg-gray-800 lg:mt-0 lg:p-0 lg:top-0 lg:relative lg:bg-transparent lg:w-auto lg:opacity-100 lg:translate-x-0 lg:flex lg:items-center">
@@ -28,7 +42,7 @@ function Navbar({account}) {
                                     <div
                                         className="w-10 h-10 overflow-hidden rounded-full">
                                         <img
-                                            src={account.imageUrl}
+                                            src={account.picture}
                                             className="object-cover w-full h-full" alt="avatar"/>
                                     </div>
 
@@ -52,48 +66,105 @@ function Navbar({account}) {
                                         className="absolute hs-dropdown-menu hs-dropdown-open:opacity-100 w-72 transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden z-20 transition-[margin,opacity] opacity-0 duration-300 mt-2 min-w-[15rem] bg-white shadow-md rounded-lg p-2 dark:bg-gray-800 dark:border dark:border-gray-700 dark:divide-gray-700"
                                     >
                                         <div className="py-2">
-                                            <a href="#"
-                                               className="flex items-center px-4 py-3 -mx-2 transition-colors duration-300 transform border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-700">
-                                                <img
-                                                    className="flex-shrink-0 object-cover w-8 h-8 mx-1 rounded-full"
-                                                    src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                                    alt="avatar"/>
-                                                <p className="mx-2 text-sm text-gray-600 dark:text-white"><span
-                                                    className="font-bold" href="#">Sara Salah</span> replied on
-                                                    the <span className="text-blue-500 hover:underline" href="#">Upload Image</span> artical
-                                                    . 2m</p>
-                                            </a>
-                                            <a href="#"
-                                               className="flex items-center px-4 py-3 -mx-2 transition-colors duration-300 transform border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-700">
-                                                <img
-                                                    className="flex-shrink-0 object-cover w-8 h-8 mx-1 rounded-full"
-                                                    src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                                    alt="avatar"/>
-                                                <p className="mx-2 text-sm text-gray-600 dark:text-white"><span
-                                                    className="font-bold" href="#">Slick Net</span> start following
-                                                    you . 45m</p>
-                                            </a>
-                                            <a href="#"
-                                               className="flex items-center px-4 py-3 -mx-2 transition-colors duration-300 transform border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-700">
-                                                <img
-                                                    className="flex-shrink-0 object-cover w-8 h-8 mx-1 rounded-full"
-                                                    src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                                    alt="avatar"/>
-                                                <p className="mx-2 text-sm text-gray-600 dark:text-white"><span
-                                                    className="font-bold" href="#">Jane Doe</span> Like Your reply
-                                                    on <span className="text-blue-500 hover:underline" href="#">Test with TDD</span> artical
-                                                    . 1h</p>
-                                            </a>
-                                            <a href="#"
-                                               className="flex items-center px-4 py-3 -mx-2 transition-colors duration-300 transform hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                <img
-                                                    className="flex-shrink-0 object-cover w-8 h-8 mx-1 rounded-full"
-                                                    src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                                    alt="avatar"/>
-                                                <p className="mx-2 text-sm text-gray-600 dark:text-white"><span
-                                                    className="font-bold" href="#">Abigail Bennett</span> start
-                                                    following you . 3h</p>
-                                            </a>
+                                            {
+                                                notificationsArr.map(notification=>{
+
+                                                    if(notification.type === 'AddFriendNotification'){
+                                                        return (
+                                                            <div
+                                                                key={`notification-${notification.id}`}
+                                                                className="flex flex-col items-center px-4 py-3 -mx-2 border-b border-gray-100 dark:border-gray-700">
+                                                                <div className={"flex "}>
+                                                                    <img
+                                                                        className="flex-shrink-0 object-cover w-8 h-8 mx-1 rounded-full"
+                                                                        src={notification.account.picture}
+                                                                        alt="avatar"/>
+                                                                    <p className="mx-2 text-sm text-gray-600 dark:text-white"><span
+                                                                        className="font-bold" >{notification.account.userName}</span> sent you a friend request {<TimeAgo date={notification.createdDate}/>}</p>
+
+                                                                </div>
+                                                                <div className="flex space-x-3 mt-1">
+                                                                    <button
+                                                                        onClick={()=>respondToFriendRequest(notification.addingId, true)}
+                                                                        type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
+                                                                        Accept
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={()=>respondToFriendRequest(notification.addingId, false)}
+                                                                        type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
+                                                                        Reject
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    else if(notification.type === 'NewPostNotification'){
+
+                                                        return(
+                                                            <div
+                                                                onClick={()=>navigate("/post/"+notification.postId)}
+                                                                key={`notification-${notification.id}`}
+                                                                className="cursor-pointer flex items-center px-4 py-3 -mx-2 transition-colors duration-300 transform border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-700">
+                                                                <img
+                                                                    className="flex-shrink-0 object-cover w-8 h-8 mx-1 rounded-full"
+                                                                    src={notification.account.picture}
+                                                                    alt="avatar"/>
+                                                                <p className="mx-2 text-sm text-gray-600 dark:text-white"><span
+                                                                    className="font-bold" >{notification.account.userName}</span> {notification.created?"created":"shared"} a new Post {<TimeAgo date={notification.createdDate}/>}</p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    else if(notification.type === 'NewCommentNotification'){
+                                                        return(
+                                                            <div
+                                                                onClick={()=>navigate("/post/"+notification.postId)}
+                                                                key={`notification-${notification.id}`}
+                                                                className="cursor-pointer flex items-center px-4 py-3 -mx-2 transition-colors duration-300 transform border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-700">
+                                                                <img
+                                                                    className="flex-shrink-0 object-cover w-8 h-8 mx-1 rounded-full"
+                                                                    src={notification.account.picture}
+                                                                    alt="avatar"/>
+                                                                <p className="mx-2 text-sm text-gray-600 dark:text-white"><span
+                                                                    className="font-bold" >{notification.account.userName}</span> commented on your post {<TimeAgo date={notification.createdDate}/>}</p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    else if (notification.type === 'NewLikeNotification'){
+                                                        return(
+                                                            <div
+                                                                onClick={()=>navigate("/post/"+notification.postId)}
+                                                                key={`notification-${notification.id}`}
+                                                                className="cursor-pointer flex items-center px-4 py-3 -mx-2 transition-colors duration-300 transform border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-700">
+                                                                <img
+                                                                    className="flex-shrink-0 object-cover w-8 h-8 mx-1 rounded-full"
+                                                                    src={notification.account.picture}
+                                                                    alt="avatar"/>
+                                                                <p className="mx-2 text-sm text-gray-600 dark:text-white"><span
+                                                                    className="font-bold" >{notification.account.userName}</span> liked your post {<TimeAgo date={notification.createdDate}/>}</p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    else{
+                                                        return(
+                                                            <div
+                                                                key={`notification-${notification.id}`}
+                                                                className="flex items-center px-4 py-3 -mx-2 border-b border-gray-100 dark:border-gray-700">
+                                                                <img
+                                                                    className="flex-shrink-0 object-cover w-8 h-8 mx-1 rounded-full"
+                                                                    src={notification.account.picture}
+                                                                    alt="avatar"/>
+                                                                <p className="mx-2 text-sm text-gray-600 dark:text-white"><span
+                                                                    className="font-bold" >notification.account.userName</span> sent you a message {<TimeAgo date={notification.createdDate}/>}</p>
+                                                            </div>
+
+                                                        );
+                                                    }
+
+
+
+                                                })
+                                            }
+
                                         </div>
 
                                     </div>
@@ -113,7 +184,7 @@ function Navbar({account}) {
                                     <div
                                         className="absolute hs-dropdown-menu hs-dropdown-open:opacity-100 w-72 transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden z-20 transition-[margin,opacity] opacity-0 duration-300 mt-2 min-w-[15rem] bg-white shadow-md rounded-lg p-2 dark:bg-gray-800 dark:border dark:border-gray-700 dark:divide-gray-700"
                                         aria-labelledby="hs-dropdown-slideup-animation">
-                                        <Link to="/profile"
+                                        <Link to={"/profile/"+account?.id}
                                               className="block px-4 py-3 text-sm text-gray-600 capitalize transition-colors duration-300 transform dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-white">
                                             view profile
                                         </Link>
@@ -123,10 +194,10 @@ function Navbar({account}) {
                                             Settings
                                         </Link>
                                         <hr className="border-gray-200 dark:border-gray-700 "/>
-                                        <Link to="#"
+                                        <div  onClick={()=>signOut()}
                                               className="block px-4 py-3 text-sm text-gray-600 capitalize transition-colors duration-300 transform dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-white">
                                             Sign Out
-                                        </Link>
+                                        </div>
                                     </div>
                                 </div>
 
