@@ -20,7 +20,8 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
     const [newPostContent, setNewPostContent] = useState("");
     const [newPostImageList, setNewPostImageList] = useState([]);
     const [isVisibleToFollowers, setIsVisibleToFollowers] = useState(false);
-
+    const [newPostLoader, setNewPostLoader] = useState(false);
+    const [friendRequestInProcess, setFriendRequestInProcess] = useState(false);
 
     const extensions = [
         StarterKit,
@@ -165,6 +166,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                     newPostEditor.commands.clearContent();
                     setNewPostContent("");
                     setNewPostImageList([]);
+                    setNewPostLoader(false);
 
                 }
 
@@ -437,7 +439,55 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             .catch(err=>console.error(err));
 
     };
+    const checkFriendRequestInProcess = (profileAccountId)=>{
 
+        fetch(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/checkFriendRequest/"+account?.id+"/"+profileAccountId,{
+            method:"GET",
+            headers:{
+                "Content-Type": "application/json",
+                "Authorization": `Bearer  ${accessToken}`
+            },
+            credentials:"include"
+        })
+            .then(async (res)=>{
+                if(res.status === 200){
+                    const data = await res.json();
+
+                    setFriendRequestInProcess(data);
+
+                }
+                else if(res.status === 401){
+                    fetch(import.meta.env.VITE_REFRESH_TOKEN,{
+                        method:"GET",
+                        headers:{
+                            "Content-Type": "application/json",
+                        },
+                        credentials:"include"
+                    })
+                        .then(async (res)=>{
+                            if(res.status === 200){
+                                const data = await res.json();
+                                setAccessToken(data.access_token);
+                                checkFriendRequestInProcess();
+                            }
+                            else{
+                                removeCookie("refresh_token");
+                                removeCookie("JSESSIONID");
+                                setAccessToken(null);
+                                navigate("/login");
+                            }
+
+                        })
+                        .catch(err=>console.error(err));
+                }
+                else{
+                    throw new Error(res.statusText);
+                }
+
+            })
+            .catch(err=>console.error(err));
+
+    };
 
 
     const postBtnContent = <div role="tooltip"
@@ -450,10 +500,23 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
 
         <div className="px-3 py-2 flex flex-col gap-1">
             <div
-                onClick={e=>newPostRequest(true, e)}
-                className="cursor-pointer transition-colors duration-300 transform rounded-md hover:bg-gray-700 p-1"
+                onClick={e=>{
+                    if(!newPostLoader){
+                        setNewPostLoader(true);
+                        newPostRequest(true, e);
+                    }
+                }}
+                className="cursor-pointer transition-colors duration-300 transform rounded-md hover:bg-gray-700 p-1 flex justify-between items-center"
             >
                 <p>In your profile</p>
+                {
+                    newPostLoader &&
+                    <div
+                        className="animate-spin inline-block w-4 h-4 border-[3px] border-current border-t-transparent text-blue-600 rounded-full dark:text-blue-500"
+                        role="status" aria-label="loading">
+                        <span className="sr-only">Loading...</span>
+                    </div>
+                }
             </div>
 
             <div
@@ -484,6 +547,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
 
     useEffect(()=>{
         fetchProfilePosts();
+        checkFriendRequestInProcess(id);
     },[]);
 
 
@@ -532,12 +596,24 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                                     </button>
                                 </>
                                 :
-                                <button
-                                    onClick={()=>friendRequest()}
-                                    type="button"
-                                    className="text-gray-900 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-full px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700">
-                                    Add Friend
-                                </button>
+                                friendRequestInProcess?
+                                    <div
+                                        className="text-gray-900 bg-white border border-gray-300 font-medium rounded-full px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:text-white dark:border-gray-600 flex items-center justify-between gap-2">
+                                        <p>Friend Request</p>
+                                        <div
+                                            className="animate-spin inline-block w-4 h-4 border-[3px] border-current border-t-transparent text-blue-600 rounded-full dark:text-blue-500"
+                                            role="status" aria-label="loading">
+                                            <span className="sr-only">Loading...</span>
+                                        </div>
+
+                                    </div>
+                                    :
+                                    <button
+                                        onClick={()=>friendRequest()}
+                                        type="button"
+                                        className="text-gray-900 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-full px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700">
+                                        Add Friend
+                                    </button>
 
 
                         }

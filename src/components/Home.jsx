@@ -19,6 +19,7 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
     const [newPostContent, setNewPostContent] = useState("");
     const [newPostImageList, setNewPostImageList] = useState([]);
     const [isVisibleToFollowers, setIsVisibleToFollowers] = useState(false);
+    const [newPostLoader, setNewPostLoader] = useState(false);
 
 
     const extensions = [
@@ -161,6 +162,7 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
                     newPostEditor.commands.clearContent();
                     setNewPostContent("");
                     setNewPostImageList([]);
+                    setNewPostLoader(false);
 
                 }
 
@@ -333,10 +335,23 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
 
         <div className="px-3 py-2 flex flex-col gap-1">
             <div
-                onClick={e=>newPostRequest(true, e)}
-                className="cursor-pointer transition-colors duration-300 transform rounded-md hover:bg-gray-700 p-1"
+                onClick={e=>{
+                    if(!newPostLoader){
+                        setNewPostLoader(true);
+                        newPostRequest(true, e);
+                    }
+                }}
+                className="cursor-pointer transition-colors duration-300 transform rounded-md hover:bg-gray-700 p-1 flex justify-between items-center"
             >
                 <p>In your profile</p>
+                {
+                    newPostLoader &&
+                    <div
+                        className="animate-spin inline-block w-4 h-4 border-[3px] border-current border-t-transparent text-blue-600 rounded-full dark:text-blue-500"
+                        role="status" aria-label="loading">
+                        <span className="sr-only">Loading...</span>
+                    </div>
+                }
             </div>
 
             <div
@@ -508,16 +523,6 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
                             <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block" src={newUser.picture} alt="avatar"/>
                             <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link" to={"/profile"+newUser.id}>{newUser.userName}</Link>
                         </div>
-                        {
-                            Boolean(newUser.id !== account?.id && !Boolean(account?.friendList.find(friend=>friend.id === newUser.id)))
-                            &&
-                            <div
-                                onClick={()=>friendRequest(newUser.id)}
-                                className="hover:bg-black rounded-full transition-colors duration-300 transform w-8 h-8 flex items-center justify-center cursor-pointer">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-6 h-6" style={{color:"#9ca3af"}}><path fill="currentColor" d="M11 17h2v-4h4v-2h-4V7h-2v4H7v2h4Zm1 5q-2.075 0-3.9-.788q-1.825-.787-3.175-2.137q-1.35-1.35-2.137-3.175Q2 14.075 2 12t.788-3.9q.787-1.825 2.137-3.175q1.35-1.35 3.175-2.138Q9.925 2 12 2t3.9.787q1.825.788 3.175 2.138q1.35 1.35 2.137 3.175Q22 9.925 22 12t-.788 3.9q-.787 1.825-2.137 3.175q-1.35 1.35-3.175 2.137Q14.075 22 12 22Zm0-2q3.35 0 5.675-2.325Q20 15.35 20 12q0-3.35-2.325-5.675Q15.35 4 12 4Q8.65 4 6.325 6.325Q4 8.65 4 12q0 3.35 2.325 5.675Q8.65 20 12 20Zm0-8Z"/></svg>
-                            </div>
-                        }
-
                     </li>);
 
 

@@ -1,48 +1,35 @@
 import {Link, useNavigate} from "react-router-dom";
 import {useRef} from "react";
 import {useCookies} from "react-cookie";
-function Login({ setAccount, setInfoToast }) {
+import axios from "axios";
+function Login({ setAccessToken }) {
 const emailRef = useRef();
 const passwordRef = useRef();
 const errRef = useRef();
-const [cookies] = useCookies(["XSRF-TOKEN"]);
 const navigate = useNavigate();
 const signinRequest = (e)=>{
     e.preventDefault();
-    const requestOptions = {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
-        },
-        body:JSON.stringify({
-            username:emailRef.current.value,
-            password:passwordRef.current.value,
-        }),
-        credentials:"include",
 
-    };
+    axios.post(import.meta.env.VITE_API_URL+'/login',{
+        email:emailRef.current.value,
+        password:passwordRef.current.value
+    },{
+        withCredentials:true
+    })
+        .then((res)=>{
 
-    fetch(import.meta.env.VITE_API_URL+"/perform_login",requestOptions)
-        .then(async (res)=>{
-            const isJson = res.headers
-                .get("content-type")
-                .includes("application/json");
+            const data = res.data;
 
-            const data = isJson ? await res.json() : null;
             if(res.status === 200){
 
-                setAccount(data.account);
-                if(!data.account.isVerified){
-                    setInfoToast("please check your inbox to verify your email");
-                }
+                setAccessToken(data.access_token);
                 navigate("/");
             }
             else if(res.status === 401){
                 errRef.current.textContent = "Invalid email or password";
             }
             else{
-                return Promise.reject(res.status);
+                throw new Error(res.statusText);
             }
 
 
@@ -59,34 +46,25 @@ const signinRequest = (e)=>{
 
 const guestSigninRequest = (e)=>{
     e.preventDefault();
-    const requestOptions = {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
-        },
-        body:JSON.stringify({
-            username:import.meta.env.VITE_GUEST_EMAIL,
-            password:import.meta.env.VITE_GUEST_PASSWORD,
-        }),
-        credentials:"include",
 
-    };
 
-    fetch(import.meta.env.VITE_API_URL+"/perform_login",requestOptions)
-        .then(async (res)=>{
-            const isJson = res.headers
-                .get("content-type")
-                .includes("application/json");
+    axios.post(import.meta.env.VITE_API_URL+'/login',{
+        email:import.meta.env.VITE_GUEST_EMAIL,
+        password:import.meta.env.VITE_GUEST_PASSWORD
+    },{
+        withCredentials:true
+    })
+        .then((res)=>{
 
-            const data = isJson ? await res.json() : null;
+
+            const data = res.data;
             if(res.status === 200){
 
-                setAccount(data.account);
+                setAccessToken(data.access_token);
                 navigate("/");
             }
             else{
-                return Promise.reject(res.status);
+                throw new Error(res.statusText);
             }
 
         })

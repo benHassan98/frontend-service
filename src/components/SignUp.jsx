@@ -1,11 +1,10 @@
 import {useRef} from "react";
 import {useNavigate} from "react-router-dom";
-import {useCookies} from "react-cookie";
 
 
 
 
-function SignUp({setInfoToast}) {
+function SignUp() {
 const fullNameRef = useRef();
 const fullNameErrRef = useRef();
 const userNameRef = useRef();
@@ -17,7 +16,6 @@ const passwordErrRef = useRef();
 const passwordConfirmRef = useRef();
 const passwordConfirmErrRef = useRef();
 const navigate = useNavigate();
-const [cookies] = useCookies(['XSRF-TOKEN']);
 const signUpRequest = (e)=>{
     e.preventDefault();
     const inputNames = ["fullName","userName","email","password","passwordConfirm"];
@@ -44,7 +42,6 @@ const signUpRequest = (e)=>{
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "X-XSRF-TOKEN":cookies["XSRF-TOKEN"],
         },
         body:JSON.stringify(inputNames.reduce((previousValue,currentValue)=>{
             let newField = {};
@@ -62,15 +59,12 @@ const signUpRequest = (e)=>{
         passwordConfirmErrRef.current.textContent = "Password Confirm should match password";
         return;
     }
-    fetch(import.meta.env.VITE_API_URL+"/account/create",requestOptions)
+    fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/create",requestOptions)
         .then(async (res) => {
-            const isJson = res.headers
-                .get("content-type")
-                .includes("application/json");
 
-            const data = isJson ? await res.json() : null;
-            if (res.status === 500) {
-                return Promise.reject(500);
+            const data = await res.json();
+            if (res.status === 200) {
+                navigate("/login");
             } else if (res.status === 400) {
 
                 data.forEach(error=>{
@@ -87,25 +81,7 @@ const signUpRequest = (e)=>{
                 });
 
             } else {
-
-
-                requestOptions.body = {
-                    token:{
-                        accountEmail:data.account.email,
-                        type:"verifyAccount"
-                    }
-
-                };
-                fetch(import.meta.env.VITE_API_URL+"/token/create",requestOptions)
-                    .then(res=>{
-                        if(res.status === 500){
-                            return Promise.reject(500);
-                        }
-                        setInfoToast("please check your inbox to verify your email");
-                        navigate("/login");
-
-                    })
-                    .catch(err=>console.error(err));
+                throw new Error(res.statusText);
 
             }
         })

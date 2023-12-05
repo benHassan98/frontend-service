@@ -391,8 +391,12 @@ function Post({
             withCredentials: true
         }).then(async (res) => {
             if (res.status === 200) {
+                const data = res.data;
                 setSuccessToast("Post Shared just Now");
 
+                if(setPostsArr){
+                    setPostsArr(prevState=>[data, ...prevState]);
+                }
 
                 publicSharedPostEditor.commands.clearContent();
                 privateSharedPostEditor.commands.clearContent();
