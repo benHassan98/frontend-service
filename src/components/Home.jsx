@@ -11,6 +11,7 @@ import axios from "axios";
 import {Modal, Tooltip} from "flowbite-react";
 import Post from "./Post.jsx";
 import {v4 as uuidv4} from 'uuid';
+import {BlobServiceClient} from "@azure/storage-blob";
 
 function Home({account, fetchAccount, notificationStompClient, setSuccessToast, setDangerToast}){
 
@@ -35,7 +36,7 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
     ];
 
 
-    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
+    const {accessToken, setAccessToken, setAccessTokenIsNull, setLogout} = useContext(AccessTokenContext);
     const [,,removeCookie] = useCookies();
     const navigate = useNavigate();
 
@@ -43,6 +44,8 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
 
     const [newPostModal, setNewPostModal] = useState(false);
 
+    const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
+    const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
     const defaultSanitizeOptions = {
         allowedTags: [ 'img', 'div', 'p' ],
         allowedAttributes: {
@@ -81,8 +84,8 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
 
         return exists;
     };
-    const newPostRequest = (isPublic, e)=>{
-        if(e){e.preventDefault();}
+    const newPostRequest = async (isPublic, e, accessTokenParam)=>{
+        e.preventDefault();
         let content = sanitizeHtml(newPostContent,defaultSanitizeOptions);
 
 
@@ -116,28 +119,31 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
         });
 
 
+        if(!accessTokenParam){
+
+            for(let i = 0;i<imageList.length;i++){
+
+                const image = imageList[i].file;
+                const imageId = imageList[i].id;
+
+                const blockBlobClient = containerClient.getBlockBlobClient(imageId);
+                await blockBlobClient.upload(image,image.size);
+            }
+
+        }
+
+
         const formData = new FormData();
         const newPost = {
             accountId:account?.id,
             content,
             visibleToFollowers,
             friendsVisibilityType,
-            visibleToFriendList,
-            imageList
+            visibleToFriendList
         };
         Object.entries(newPost).forEach(([k,v])=>{
-            if(k === 'imageList'){
-                v.forEach(image=>{
-                    formData.append("idList",image.id);
-                    formData.append("fileList",image.file);
-                });
 
-            }
-            else{
-                formData.append(k,v);
-            }
-
-
+            formData.append(k,v);
 
         });
 
@@ -149,24 +155,27 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
             data: formData,
             headers: {
                 'Content-Type': 'multipart/form-data',
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             withCredentials:true
         })
             .then( async (res)=>{
 
-                if(res.status === 200){
-                    const data = res.data;
-                    setPostsArr(prevState => [data,...prevState]);
+                const data = res.data;
+                console.log("newPost Home:  ",data);
+                setPostsArr(prevState => [data,...prevState]);
 
-                    newPostEditor.commands.clearContent();
-                    setNewPostContent("");
-                    setNewPostImageList([]);
-                    setNewPostLoader(false);
+                newPostEditor.commands.clearContent();
+                setNewPostContent("");
+                setNewPostImageList([]);
+                setNewPostLoader(false);
 
-                }
 
-                else if(res.status === 401){
+
+
+            })
+            .catch(err=>{
+            if(err.response.status === 401){
 
                     fetch(import.meta.env.VITE_REFRESH_TOKEN,{
                         method:"GET",
@@ -179,13 +188,10 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
                             if(res.status === 200){
                                 const data = await res.json();
                                 setAccessToken(data.access_token);
-                                newPostRequest(isPublic);
+                                await newPostRequest(isPublic, e, data.access_token);
                             }
                             else{
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
+                                setLogout(true);
                             }
 
                         })
@@ -193,135 +199,112 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
 
                 }
                 else {
-                    setDangerToast("An Error Ocurred");
-                    throw new Error(res.statusText);
+                    setDangerToast("An Error Occurred");
+                    console.error(err);
                 }
 
 
 
 
-            })
-            .catch(err=>console.error(err));
+
+            });
 
     };
-    const friendRequest = (addedId)=>{
+    const fetchHomePosts = async (accessTokenParam)=>{
 
-        notificationStompClient.send(
-            "/addFriend",
-            {},
-            JSON.stringify({
-                addingId:account?.id,
-                addedId,
-                isRequest:true,
-                isAccepted:false
-            }));
+        try{
+             const res =  await fetch(import.meta.env.VITE_POST_SERVICE+"/account/"+account?.id,{
+                 method:"GET",
+                 headers:{
+                     "Content-Type": "application/json",
+                     "Authorization": `Bearer ${accessTokenParam||accessToken}`
+                 },
+                 credentials:"include"
+             });
+            if(res.status === 200){
+                const data = await res.json();
 
+                console.log("data: ",data);
 
-    };
-    const fetchHomePosts = ()=>{
+                setPostsArr([...data.reverse()]);
 
-        fetch(import.meta.env.VITE_POST_SERVICE+"/account/"+account?.id,{
-            method:"GET",
-            headers:{
-                "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
-            },
-            credentials:"include"
-        })
-            .then(async (res)=>{
-                if(res.status === 200){
-                    const data = await res.json();
-
-                    console.log("data: ",data);
-
-                    setPostsArr([...data.reverse()]);
-
-                }
-                else if(res.status === 401){
-                    fetch(import.meta.env.VITE_REFRESH_TOKEN,{
-                        method:"GET",
-                        headers:{
-                            "Content-Type": "application/json",
-                        },
-                        credentials:"include"
-                    })
-                        .then(async (res)=>{
-                            if(res.status === 200){
-                                const data = await res.json();
-                                setAccessToken(data.access_token);
-                                fetchHomePosts();
-                            }
-                            else{
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
-                            }
-
-                        })
-                        .catch(err=>console.error(err));
+            }
+            else if(res.status === 401){
+              const tokenRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN,{
+                    method:"GET",
+                    headers:{
+                        "Content-Type": "application/json",
+                    },
+                    credentials:"include"
+                });
+                if(tokenRes.status === 200){
+                    const data = await tokenRes.json();
+                    setAccessToken(data.access_token);
+                    fetchHomePosts(data.access_token);
                 }
                 else{
-                    throw new Error(res.statusText);
+                    setLogout(true);
                 }
+            }
+            else{
+                console.error(res.statusText);
+            }
 
-            })
-            .catch(err=>console.error(err));
+        }
+        catch(e){
+             console.error(e);
+        }
 
     };
-    const fetchNewUsers = ()=>{
+    const fetchNewUsers = async (accessTokenParam)=>{
 
-        fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/newUsers",{
-            method:"GET",
-            headers:{
-                "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
-            },
-            credentials:"include"
-        })
-            .then(async (res)=>{
-                if(res.status === 200){
-                    const data = await res.json();
-                    const tempNewUsersArr = [];
-                    for(let i =0;i<data.length;i++){
-                        const newUser = await fetchAccount(data[i]);
-                        tempNewUsersArr.push(newUser);
-                    }
-
-                    console.log("newUsers: ",tempNewUsersArr);
-                    setNewUsersArr([...tempNewUsersArr]);
-
+        try{
+            const res = await fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/newUsers",{
+                method:"GET",
+                headers:{
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${accessTokenParam||accessToken}`
+                },
+                credentials:"include"
+            });
+            if(res.status === 200){
+                const data = await res.json();
+                const tempNewUsersArr = [];
+                for(let i =0;i<data.length;i++){
+                    console.log("newUser id: ",data[i]);
+                    const newUser = await fetchAccount(data[i]);
+                    tempNewUsersArr.push(newUser);
                 }
-                else if(res.status === 401){
-                    fetch(import.meta.env.VITE_REFRESH_TOKEN,{
-                        method:"GET",
-                        headers:{
-                            "Content-Type": "application/json",
-                        },
-                        credentials:"include"
-                    })
-                        .then(async (res)=>{
-                            if(res.status === 200){
-                                const data = await res.json();
-                                setAccessToken(data.access_token);
-                                fetchNewUsers();
-                            }
-                            else{
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
-                            }
 
-                        })
-                        .catch(err=>console.error(err));
+                console.log("newUsers: ",tempNewUsersArr);
+                setNewUsersArr([...tempNewUsersArr]);
+
+            }
+            else if(res.status === 401){
+                const tokenRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN,{
+                    method:"GET",
+                    headers:{
+                        "Content-Type": "application/json",
+                    },
+                    credentials:"include"
+                });
+                if(tokenRes.status === 200){
+                    const data = await tokenRes.json();
+                    setAccessToken(data.access_token);
+                    fetchNewUsers(data.access_token);
                 }
                 else{
-                    throw new Error(res.statusText);
+                    setLogout(true);
                 }
 
-            })
-            .catch(err=>console.error(err));
+            }
+            else{
+                console.error(res.statusText);
+            }
+        }
+        catch (e) {
+            console.error(e);
+        }
 
     };
 
@@ -367,11 +350,13 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
 
 
     useEffect(()=>{
-        if(account){
-            fetchHomePosts();
-        }
-        fetchNewUsers();
-    },[account]);
+
+        ( async ()=>{
+            await fetchHomePosts();
+            await fetchNewUsers();
+        })();
+
+    },[]);
 
 
 
@@ -521,7 +506,7 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
 
                         <div className="flex items-center">
                             <img className="hidden object-cover w-10 h-10 mr-2 rounded-full sm:block" src={newUser.picture} alt="avatar"/>
-                            <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link" to={"/profile"+newUser.id}>{newUser.userName}</Link>
+                            <Link className="font-bold text-gray-700 cursor-pointer dark:text-gray-200" tabIndex="0" role="link" to={"/profile/"+newUser.id}>{newUser.userName}</Link>
                         </div>
                     </li>);
 

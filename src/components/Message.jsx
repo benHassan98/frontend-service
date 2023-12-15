@@ -1,8 +1,7 @@
 import {useContext, useEffect, useMemo, useRef, useState} from "react";
 import {Tooltip} from "flowbite-react";
-import {AccessTokenContext} from "./AccessTokenProvider.jsx";
-import {useCookies} from "react-cookie";
-import {useNavigate} from "react-router-dom";
+import ContentEditable from "react-contenteditable";
+import parse from "html-react-parser";
 
 
 function useIsInViewport(ref) {
@@ -27,21 +26,77 @@ function useIsInViewport(ref) {
     return isIntersecting;
 }
 
-function Message({accountId, message, setMessagesArr, stompClient}){
+function Message({accountId, setUnReadMessages, setMessagesArr, messageProp, stompClient, containerClient}){
+    const [message, setMessage] = useState(messageProp);
     const messageRef = useRef(null);
     const isInViewPort = useIsInViewport(messageRef);
-    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
-    const [,,removeCookie] = useCookies();
-    const navigate = useNavigate();
+
     const deleteMessage = ()=>{
+        stompClient?.send("/chat/delete",
+            {},
+            JSON.stringify({...message})
+        );
+        setMessagesArr(prevState=>[...prevState.map(msg=>msg.id===message.id?{
+            ...msg,
+            content:"",
+            deleted:true
+        }:msg)]);
+        setMessage({
+            ...message,
+            content:"",
+            deleted:true
+        });
+    };
+    const injectImages = async ()=>{
+
+
+
+        const imagesNameArr = [];
+
+
+
+
+        parse(messageProp.content,{
+            replace(domNode){
+                if (domNode.name === "img") {
+                    imagesNameArr.push(domNode.attribs.src);
+                    return domNode;
+                }
+            }
+        });
+
+        let newContent = messageProp.content;
+
+        for(let elem of imagesNameArr){
+
+            const elemBlobClient = containerClient.getBlobClient(elem);
+            const elemBlob = await elemBlobClient.download();
+            const elemBlobBody = await elemBlob.blobBody;
+            const elemURL = URL.createObjectURL(elemBlobBody);
+
+            newContent = newContent.replace(elem, elemURL);
+        }
+
+        setMessage({
+            ...messageProp,
+            content:newContent,
+
+        });
 
 
     };
+    useEffect(()=>{
+        injectImages();
+    },[]);
 
     useEffect(()=>{
-        if(isInViewPort && !message.viewed){
-            message.viewed = true;
+        if(isInViewPort && !message.viewed && message.id){
+            setMessage({
+                ...message,
+                viewed:true
+            });
             stompClient?.send('/chat/view/'+message.id);
+            setUnReadMessages(prevState=>[...prevState.filter(msg=>msg.id !== message.id)]);
         }
     },[isInViewPort]);
 
@@ -61,7 +116,7 @@ function Message({accountId, message, setMessagesArr, stompClient}){
         if(message.deleted){
 
             return (
-                <div className="self-end bg-black rounded-full px-3 py-1 mt-2 border-2 border-white">
+                <div className="self-end bg-black rounded-full px-3 py-1 mt-2 border-2 border-white" ref={messageRef}>
                     <p className="text-xl text-white">*Deleted message*</p>
                 </div>
             );
@@ -72,7 +127,12 @@ function Message({accountId, message, setMessagesArr, stompClient}){
                 <div className={"self-end mt-2"}>
                     <Tooltip content={pic} arrow={false} placement={'left'} trigger={"hover"} className={"p-0 m-0"}>
                         <div className="bg-gray-600 rounded-full px-3 py-1" ref={messageRef}>
-                            <p className="text-xl text-white">{message.content}</p>
+                            <ContentEditable
+                                className={"text-xl text-white"}
+                                html={message.content}
+                                onChange={()=>{}}
+                                disabled={true}
+                            />
                         </div>
                     </Tooltip>
                 </div>
@@ -89,7 +149,7 @@ function Message({accountId, message, setMessagesArr, stompClient}){
         if(message.deleted){
 
             return (
-                <div className="self-start bg-black rounded-full px-3 py-1 mt-2 border-2 border-white">
+                <div className="self-start bg-black rounded-full px-3 py-1 mt-2 border-2 border-white" ref={messageRef}>
                     <p className="text-xl text-white">*Deleted message*</p>
                 </div>
             );
@@ -99,7 +159,12 @@ function Message({accountId, message, setMessagesArr, stompClient}){
         else{
             return(
                 <div className="self-start mt-2 bg-slate-900 rounded-full px-3 py-1" ref={messageRef}>
-                    <p className="text-xl text-white">{message.content}</p>
+                    <ContentEditable
+                        className={"text-xl text-white"}
+                        html={message.content}
+                        onChange={()=>{}}
+                        disabled={true}
+                    />
                 </div>
 
             );
@@ -108,20 +173,6 @@ function Message({accountId, message, setMessagesArr, stompClient}){
 
     }
 
-
-
-
-
-    return(
-        <div className={"self-end mt-2"}>
-            <Tooltip content={pic} arrow={false} placement={'left'} trigger={"hover"} className={"p-0 m-0"}>
-                <div className="bg-gray-600 rounded-full px-3 py-1" ref={messageRef}>
-                    <p className="text-xl text-white">{content}</p>
-                </div>
-            </Tooltip>
-        </div>
-
-    );
 }
 
 

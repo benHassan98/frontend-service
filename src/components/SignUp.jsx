@@ -1,5 +1,6 @@
 import {useRef} from "react";
 import {useNavigate} from "react-router-dom";
+import axios from "axios";
 
 
 
@@ -38,36 +39,34 @@ const signUpRequest = (e)=>{
 
     });
 
-    const requestOptions = {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body:JSON.stringify(inputNames.reduce((previousValue,currentValue)=>{
-            let newField = {};
-            newField[currentValue] = refObj[currentValue].current.value;
-            return {...previousValue,...newField};
-
-        },{})),
-        credentials:"include"
-
-    };
-
     if(passwordConfirmRef.current.value !== passwordRef.current.value){
         passwordConfirmRef.current.classList.remove("border-gray-600");
         passwordConfirmRef.current.classList.add("border-red-600");
         passwordConfirmErrRef.current.textContent = "Password Confirm should match password";
         return;
     }
-    fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/create",requestOptions)
-        .then(async (res) => {
 
-            const data = await res.json();
-            if (res.status === 200) {
-                navigate("/login");
-            } else if (res.status === 400) {
+    const formData = new FormData();
 
-                data.forEach(error=>{
+    inputNames.forEach(name=>{
+        formData.append(name, refObj[name].current.value);
+    });
+
+    axios({
+        method: 'POST',
+        url: import.meta.env.VITE_ACCOUNT_SERVICE+"/create",
+        data: formData,
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    }).then(() => {
+            navigate("/login");
+        })
+        .catch(err=>{
+            console.log(err);
+            if (err.response.status === 400) {
+
+                err.response.data.forEach(error=>{
                     const {defaultMessage} = error;
                     const field = error.field ||
                         inputNames.
@@ -81,19 +80,19 @@ const signUpRequest = (e)=>{
                 });
 
             } else {
-                throw new Error(res.statusText);
+                console.error(err.response.statusText);
 
             }
-        })
 
-        .catch(err=>console.error(err));
+
+        });
 
 
 };
 
 
 return (
-    <div className="flex flex-col justify-center items-center w-screen h-screen">
+    <div className="flex flex-col justify-center items-center h-screen">
         <div className="w-full max-w-sm p-6 m-auto mx-auto bg-white rounded-lg shadow-md dark:bg-gray-800">
             <div className="flex justify-center mx-auto">
                 <h1 className="text-white text-4xl">Odin Book</h1>

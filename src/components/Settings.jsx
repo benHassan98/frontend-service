@@ -4,18 +4,21 @@ import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 import {useCookies} from "react-cookie";
 import {useNavigate} from "react-router-dom";
 import {v4 as uuidv4} from 'uuid';
+import {BlobServiceClient} from "@azure/storage-blob";
 
 function Settings({account, fetchAccount, setAccount, setSuccessToast,  setInfoToast, setDangerToast}){
 
     const [image, setImage] = useState(null);
     const aboutMeRef = useRef();
 
-    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
-    const [, , removeCookie] = useCookies();
+    const {accessToken, setAccessToken, setLogout} = useContext(AccessTokenContext);
     const navigate = useNavigate();
+    const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
+    const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
 
 
-    const verifyAccountRequest = ()=>{
+
+    const verifyAccountRequest = (accessTokenParam)=>{
 
         const token = {
             accountEmail:account?.email,
@@ -27,7 +30,7 @@ function Settings({account, fetchAccount, setAccount, setSuccessToast,  setInfoT
             method:"POST",
             headers:{
                 "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             body:JSON.stringify(token),
 
@@ -48,12 +51,9 @@ function Settings({account, fetchAccount, setAccount, setSuccessToast,  setInfoT
                             if (res.status === 200) {
                                 const data = await res.json();
                                 setAccessToken(data.access_token);
-                                verifyAccountRequest();
+                                verifyAccountRequest(data.access_token);
                             } else {
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
+                                setLogout(true);
                             }
 
                         })
@@ -68,9 +68,9 @@ function Settings({account, fetchAccount, setAccount, setSuccessToast,  setInfoT
             .catch(err=>console.error(err));
 
     };
-    const updateRequest = (e)=>{
+    const updateRequest = async (e, accessTokenParam)=>{
 
-        if(e){e.preventDefault();}
+        e.preventDefault();
 
         const formData = new FormData();
 
@@ -83,9 +83,10 @@ function Settings({account, fetchAccount, setAccount, setSuccessToast,  setInfoT
             formData.append(k,v);
         });
 
-        if(image.id){
-            formData.append("name",image.id);
-            formData.append("file",image.file);
+        if(image.id && !accessTokenParam){
+            const blockBlobClient = containerClient.getBlockBlobClient(image.id);
+            await blockBlobClient.upload(image.file,image.file.size);
+
         }
         formData.delete("url");
         formData.delete("image");
@@ -97,58 +98,52 @@ function Settings({account, fetchAccount, setAccount, setSuccessToast,  setInfoT
             data: formData,
             headers: {
                 'Content-Type': 'multipart/form-data',
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             withCredentials: true
-        }).then(async (res) => {
-            if (res.status === 200) {
-                const data = await fetchAccount(account.id);
+        }).then(async () => {
+            const data = await fetchAccount(account.id);
 
-                setAccount({...data});
-                setSuccessToast("Account Updated");
+            setAccount({...data});
+            setSuccessToast("Account Updated");
 
-
-            } else if (res.status === 401) {
-                fetch(import.meta.env.VITE_REFRESH_TOKEN, {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    credentials: "include"
-                })
-                    .then(async (res) => {
-                        if (res.status === 200) {
-                            const data = await res.json();
-                            setAccessToken(data.access_token);
-                            updateRequest();
-                        } else {
-                            removeCookie("refresh_token");
-                            removeCookie("JSESSIONID");
-                            setAccessToken(null);
-                            navigate("/login");
-                        }
-
-                    })
-                    .catch(err => console.error(err));
-            } else {
-                setDangerToast("An Error ocurred");
-                throw new Error(res.statusText);
-            }
 
         })
-            .catch(err => console.error(err));
+            .catch(err => {
+                if (err.response.status === 401) {
+                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
+                        method: "GET",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        credentials: "include"
+                    })
+                        .then(async (res) => {
+                            if (res.status === 200) {
+                                const data = await res.json();
+                                setAccessToken(data.access_token);
+                                await updateRequest(e, data.access_token);
+                            } else {
+                                setLogout(true);
+                            }
+
+                        })
+                        .catch(err => console.error(err));
+                } else {
+                    setDangerToast("An Error ocurred");
+                    console.error(err);
+                }
+            });
 
 
     };
 
     useEffect(()=>{
-if(account){
-    setImage({
-        url:account.picture
-    });
-    aboutMeRef.current.textContent = account.aboutMe || "About Me";
-}
-    },[account]);
+        setImage({
+            url:account.picture
+        });
+        aboutMeRef.current.textContent = account.aboutMe || "About Me";
+    },[]);
 
 
 

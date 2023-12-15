@@ -1,17 +1,17 @@
-import React, {useContext, useEffect, useState} from 'react';
+import {useContext, useEffect, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import TimeAgo from 'react-timeago';
-import {useCookies} from "react-cookie";
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 import SockJS from "sockjs-client";
 import {Stomp} from "@stomp/stompjs";
-function Navbar({account, setAccount, fetchAccount, notificationsArr, respondToFriendRequest}) {
+
+
+function Navbar({account, fetchAccount, notificationsArr, setNotificationsArr, respondToFriendRequest}) {
 
     const [accountsArr, setAccountsArr] = useState([]);
     const [searchText, setSearchText] = useState("");
     const navigate = useNavigate();
-    const [,,removeCookie] = useCookies();
-    const {setAccessToken} = useContext(AccessTokenContext);
+    const {accessToken, setAccessToken, logout, setLogout} = useContext(AccessTokenContext);
 
     const [stompClient, setStompClient] = useState(null);
 
@@ -26,22 +26,25 @@ function Navbar({account, setAccount, fetchAccount, notificationsArr, respondToF
 
             stompClient.subscribe(`/exchange/accountSearch/${account?.id}`,async (req)=> {
                 const reqBody = JSON.parse(req.body);
+
+                console.log("searchResults: ",reqBody);
                 const temp = [];
 
                 for(let i =0;i<reqBody.length;i++){
-                    const searchAccount = await fetchAccount(reqBody[i].id);
+                    const searchAccount = await fetchAccount(reqBody[i]);
 
                     temp.push(searchAccount);
 
                 }
 
                 setAccountsArr([...temp]);
-            });
-
 
             });
 
 
+            });
+
+        setStompClient(stompClient);
     };
     const searchRequest = (searchContent)=>{
         stompClient.send(
@@ -53,26 +56,71 @@ function Navbar({account, setAccount, fetchAccount, notificationsArr, respondToF
             );
     };
 
+    const setNotificationsAsViewed = (accessTokenParam)=>{
 
+
+        fetch(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/notifications/view/"+account?.id,{
+            method:"GET",
+            headers:{
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
+            },
+            credentials:"include"
+        })
+            .then(async (res) => {
+
+                if (res.status === 200) {
+                    setNotificationsArr(prevState=>[...prevState.map(n=>({...n,viewed:true}))]);
+                } else if (res.status === 401) {
+
+                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
+                        method: "GET",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        credentials: "include"
+                    })
+                        .then(async (res) => {
+                            if (res.status === 200) {
+                                const data = await res.json();
+                                setAccessToken(data.access_token);
+                                setNotificationsAsViewed(data.access_token);
+                            } else {
+                                setLogout(true);
+                            }
+
+                        })
+                        .catch(err => console.error(err));
+
+                } else {
+                    throw new Error(res.statusText);
+                }
+
+
+            })
+            .catch(err => console.error(err));
+
+
+    };
     const signOut = ()=>{
-
-        removeCookie("refresh_token");
-        removeCookie("JSESSIONID");
-        setAccessToken(null);
-        setAccount(null);
+        setLogout(true);
     }
 
     useEffect(()=>{
 
-        if(account){
+        if(account ){
             setupStomp();
         }
 
-        return ()=>{
-            stompClient?.disconnect();
-            setStompClient(null);
-        };
+
     },[account]);
+
+    useEffect(()=>{
+        if(logout){
+            stompClient?.disconnect();
+        }
+    },[logout]);
+
 
     useEffect(()=>{
         if(searchText){
@@ -113,6 +161,7 @@ function Navbar({account, setAccount, fetchAccount, notificationsArr, respondToF
                                            className="block w-full p-4 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50  dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white "
                                            placeholder="Search Users..."
                                            onKeyUp={(e)=>setSearchText(e.currentTarget.value)}
+                                           onBlur={()=>setAccountsArr([])}
                                     />
 
                                 </div>
@@ -128,7 +177,7 @@ function Navbar({account, setAccount, fetchAccount, notificationsArr, respondToF
                                                 <div
                                                     key={`search-${searchAccount.id}`}
                                                     onClick={()=>navigate("/profile/"+searchAccount.id)}
-                                                    className="cursor-pointer flex items-center px-4 py-3 -mx-2 border-b border-gray-100 dark:border-gray-700">
+                                                    className="cursor-pointer flex items-center px-4 py-3 -mx-2 border-b border-gray-100 dark:border-gray-700 w-[25rem]">
                                                     <img className="flex-shrink-0 object-cover w-8 h-8 mx-1 rounded-full"
                                                          src={searchAccount.picture}
                                                          alt="avatar"/>
@@ -168,6 +217,11 @@ function Navbar({account, setAccount, fetchAccount, notificationsArr, respondToF
                                 <div className="hs-dropdown relative inline-block [--placement:bottom]">
 
                                     <button
+                                        onClick={()=>{
+                                            if(notificationsArr.length && !notificationsArr[0].viewed){
+                                                setNotificationsAsViewed();
+                                            }
+                                        }}
                                         className="hs-dropdown-toggle relative z-10 block p-2 text-gray-700 border border-transparent rounded-md dark:text-white focus:border-blue-500 focus:ring-opacity-40 dark:focus:ring-opacity-40 focus:ring-blue-300 dark:focus:ring-blue-400 focus:ring bg-gray-900 focus:outline-none mr-2">
 
                                         {
@@ -339,7 +393,7 @@ function Navbar({account, setAccount, fetchAccount, notificationsArr, respondToF
                                         </Link>
                                         <hr className="border-gray-200 dark:border-gray-700 "/>
                                         <div  onClick={()=>signOut()}
-                                              className="block px-4 py-3 text-sm text-gray-600 capitalize transition-colors duration-300 transform dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-white">
+                                              className="cursor-pointer block px-4 py-3 text-sm text-gray-600 capitalize transition-colors duration-300 transform dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-white">
                                             Sign Out
                                         </div>
                                     </div>

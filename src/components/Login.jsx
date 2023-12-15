@@ -1,12 +1,13 @@
 import {Link, useNavigate} from "react-router-dom";
-import {useRef} from "react";
-import {useCookies} from "react-cookie";
+import {useContext, useRef} from "react";
 import axios from "axios";
-function Login({ setAccessToken }) {
+import {AccessTokenContext} from "./AccessTokenProvider.jsx";
+function Login({setAccount, fetchAccount }) {
 const emailRef = useRef();
 const passwordRef = useRef();
 const errRef = useRef();
 const navigate = useNavigate();
+    const {setAccessToken, setAccessTokenIsNull, setLogout} = useContext(AccessTokenContext);
 const signinRequest = (e)=>{
     e.preventDefault();
 
@@ -16,17 +17,16 @@ const signinRequest = (e)=>{
     },{
         withCredentials:true
     })
-        .then((res)=>{
-
-            const data = res.data;
+        .then( async (res)=>{
 
             if(res.status === 200){
 
+                const data = res.data;
+
                 setAccessToken(data.access_token);
+                setAccessTokenIsNull(false);
+                setLogout(false);
                 navigate("/");
-            }
-            else if(res.status === 401){
-                errRef.current.textContent = "Invalid email or password";
             }
             else{
                 throw new Error(res.statusText);
@@ -34,10 +34,13 @@ const signinRequest = (e)=>{
 
 
 
-
-
         })
-        .catch(err=>console.error(err));
+        .catch(err=>{
+        if(err.response.status === 401){
+                errRef.current.textContent = "Invalid email or password";
+            }
+        console.error(err);
+        });
 
 
 
@@ -54,23 +57,17 @@ const guestSigninRequest = (e)=>{
     },{
         withCredentials:true
     })
-        .then((res)=>{
-
+        .then( async (res)=>{
 
             const data = res.data;
-            if(res.status === 200){
 
-                setAccessToken(data.access_token);
-                navigate("/");
-            }
-            else{
-                throw new Error(res.statusText);
-            }
+            setAccessToken(data.access_token);
+            setAccessTokenIsNull(false);
+            setLogout(false);
+            navigate("/");
 
         })
         .catch(err=>console.error(err));
-
-
 
 
 }
@@ -81,7 +78,7 @@ const guestSigninRequest = (e)=>{
 
     return (
 
-        <div className="flex flex-col justify-center items-center w-screen h-screen">
+        <div className="flex flex-col justify-center items-center h-screen">
             <div className="w-full max-w-sm p-6 m-auto mx-auto bg-white rounded-lg shadow-md dark:bg-gray-800">
                 <div className="flex justify-center mx-auto">
                     <h1 className="text-white text-4xl">Odin Book</h1>

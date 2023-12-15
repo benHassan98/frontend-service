@@ -12,10 +12,11 @@ import {useCookies} from "react-cookie";
 import {useNavigate} from "react-router-dom";
 import {v4 as uuidv4} from "uuid";
 import Message from "./Message.jsx";
-import axios from "axios";
 
-function Messenger({account, setDangerToast}){
 
+function Messenger({account}){
+
+    const [newMessage, setNewMessage] = useState(null);
     const [friendsArr, setFriendsArr] = useState([]);
     const [chatIsOpen, setChatIsOpen] = useState(false);
     const [chatFriend, setChatFriend] = useState(null);
@@ -27,8 +28,9 @@ function Messenger({account, setDangerToast}){
 
     const [stompClient, setStompClient] = useState(null);
 
+
     const [,,removeCookie] = useCookies();
-    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
+    const {accessToken, setAccessToken, setAccessTokenIsNull, logout, setLogout} = useContext(AccessTokenContext);
     const navigate = useNavigate();
 
     const extensions = [
@@ -69,78 +71,82 @@ function Messenger({account, setDangerToast}){
     });
 
     const setupStomp = ()=>{
+        console.log("account?   ",account);
         let socket = new SockJS(import.meta.env.VITE_CHAT_SERVICE+"/chat/websocket");
         let stompClient = Stomp.over(socket);
 
-        stompClient.connect({}, function (frame) {
-
+        stompClient.connect({},function (frame) {
             console.log('Connected: ' + frame);
 
-            stompClient.subscribe(`/queue/chat.${account?.id}`,async (req)=> {
-                const reqBody = JSON.parse(req.body);
-                const newContent = await injectImages(reqBody.content);
-                const newMessage = {
-                    ...reqBody,
-                    content:newContent
-                };
+            stompClient.subscribe(`/queue/chat.${account?.id}`,(req)=> {
+                    const reqBody = JSON.parse(req.body);
 
-                if(newMessage.senderId === chatFriend?.id){
-                    setMessagesArr(prevState => [...prevState, newMessage]);
-                }
-                else {
-                 setUnReadMessages(prevState => [...prevState, newMessage]);
-                }
+                    console.log("newMessage:  ",reqBody);
+                    setNewMessage({
+                        ...reqBody
+                    });
 
-            }
-            // ,{
-            //     'auto-delete':true,
-            //     'durable':true
-            // }
+                }
+                ,{
+                    'auto-delete':true,
+                    'durable':true
+                }
             );
 
-            stompClient.subscribe(`/exchange/availableFriends/${account?.id}`,async (req)=>{
+            stompClient.subscribe(`/exchange/availableFriends/${account?.id}`,(req)=>{
                 const reqBody = JSON.parse(req.body);
-                setFriendsArr(prevState => [...prevState.map(friend=>({...friend,available:reqBody.includes(friend.id)}))]);
+                console.log("reqBody:  ",reqBody);
+                setFriendsArr( prevState =>[...prevState.map(friend=>({...friend,available:reqBody.includes(friend.id)}))]);
 
             });
 
-            stompClient.subscribe(`/exchange/availableFriends/availableFriend.${account?.id}`,async (req)=>{
+
+            stompClient.subscribe(`/exchange/availableFriends/availableFriend.${account?.id}`,(req)=>{
                 const reqBody = JSON.parse(req.body);
-                setFriendsArr(prevState => [...prevState, account?.friendList.find(friend=>friend.id === reqBody)]);
+                setFriendsArr(prevState => [...prevState.map(friend=>friend.id === reqBody?{
+                    ...friend,
+                    available:true
+                }:friend)]);
 
             });
 
-            stompClient.subscribe(`/exchange/availableFriends/unAvailableFriend.${account?.id}`,async (req)=>{
+            stompClient.subscribe(`/exchange/availableFriends/unAvailableFriend.${account?.id}`,(req)=>{
                 const reqBody = JSON.parse(req.body);
-                setFriendsArr(prevState => [...prevState.filter(friend=>friend.id !== reqBody)]);
+                setFriendsArr(prevState => [...prevState.map(friend=>friend.id === reqBody?{
+                    ...friend,
+                    available:false
+                }:friend)]);
 
             });
 
-            stompClient.send(
-                "/chat/availableFriend",
-                {},
-                JSON.stringify({
-                    accountId:account?.id,
-                    friendList:friendsArr.map(friend=>friend.id)
-                })
-            );
+            setTimeout(()=>{
+                stompClient.send(
+                    "/chat/availableFriends",
+                    {},
+                    JSON.stringify({
+                        accountId:account?.id,
+                        friendList:account?.friendList.map(friend=>friend.id)
+                    })
+                );
 
-            stompClient.send(
-                "/chat/availableFriends",
-                {},
-                JSON.stringify({
-                    accountId:account?.id,
-                    friendList:friendsArr.map(friend=>friend.id)
-                }));
+                stompClient.send(
+                    "/chat/availableFriend",
+                    {},
+                    JSON.stringify({
+                        accountId:account?.id,
+                        friendList:account?.friendList.map(friend=>friend.id)
+                    })
+                );
 
-
+            },3000);
 
         });
 
+
+
+
+
         setStompClient(stompClient);
-
-
-
 
 
     };
@@ -161,8 +167,8 @@ function Messenger({account, setDangerToast}){
 
         return exists;
     };
-    const newMessageRequest = (e)=>{
-        if(e){e.preventDefault();}
+    const newMessageRequest = async (e)=>{
+        e.preventDefault();
 
         let content = sanitizeHtml(newMessageContent, defaultSanitizeOptions);
         const imageList = newMessageImageList.filter(image => isImageExists(image.url, content));
@@ -173,6 +179,7 @@ function Messenger({account, setDangerToast}){
             content
         };
 
+
         imageList.forEach(image => {
             content = content.replace(image.url, image.id);
             URL.revokeObjectURL(image.url);
@@ -181,10 +188,19 @@ function Messenger({account, setDangerToast}){
         const idList = imageList.map(image=>image.id);
         const fileList = imageList.map(image=>image.file);
 
-        const formData = new FormData();
+        for(let i = 0;i<idList.length;i++){
 
-        formData.append("idList", idList);
-        formData.append("fileList", fileList);
+            const newImageId = idList[i];
+            const newImage = fileList[i];
+
+
+            const blockBlobClient = containerClient.getBlockBlobClient(newImageId);
+            await blockBlobClient.upload(newImage,newImage.size);
+
+        }
+
+
+
 
 
         stompClient.send(
@@ -195,29 +211,33 @@ function Messenger({account, setDangerToast}){
                 content
             }));
 
+        newMessageEditor.commands.clearContent();
+        setNewMessageContent("");
+        setNewMessageImageList([]);
 
 
-        axios({
-            method: 'POST',
-            url: import.meta.env.VITE_CHAT_SERVICE + "/message/images",
-            data: formData,
+
+    };
+
+    const fetchMessages = (accountId, accessTokenParam)=>{
+
+        fetch(import.meta.env.VITE_CHAT_SERVICE + "/messages/" + accountId+'/'+account?.id, {
+            method: "GET",
             headers: {
-                'Content-Type': 'multipart/form-data',
-                "Authorization": `Bearer  ${accessToken}`
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
-            withCredentials: true
+            credentials: "include"
         })
-            .then(res=>{
+            .then(async (res) => {
                 if (res.status === 200) {
+                    const data = await res.json();
 
-                    setMessagesArr(prevState => [...prevState, newMessage])
+                    console.log("Messages: ", data);
 
-                    setNewMessageContent("");
-                    newMessageEditor.commands.clearContent();
-                    setNewMessageImageList([]);
+                    setMessagesArr([...data]);
 
                 } else if (res.status === 401) {
-
                     fetch(import.meta.env.VITE_REFRESH_TOKEN, {
                         method: "GET",
                         headers: {
@@ -229,197 +249,131 @@ function Messenger({account, setDangerToast}){
                             if (res.status === 200) {
                                 const data = await res.json();
                                 setAccessToken(data.access_token);
-                                newMessageRequest();
+                                fetchMessages(accountId, data.access_token);
                             } else {
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
+                                setLogout(true);
                             }
 
                         })
                         .catch(err => console.error(err));
-
                 } else {
-                    setDangerToast("An Error Ocurred");
                     throw new Error(res.statusText);
                 }
 
-
-
             })
-            .catch(err=>console.error(err));
+            .catch(err => console.error(err));
+
+
 
     };
 
-    const injectImages = async (content)=>{
+    const fetchUnReadMessages = async (accessTokenParam)=>{
 
-        const imagesNameArr = [];
-        const urlToSrc = {};
+        try{
+           const res = await fetch(import.meta.env.VITE_CHAT_SERVICE + "/message/unRead/"+account?.id, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${accessTokenParam||accessToken}`
+                },
+                credentials: "include"
+            });
+            if (res.status === 200) {
+                const data = await res.json();
 
 
-        parse(content,{
-            replace(domNode){
-                if (domNode.name === "img") {
-                    imagesNameArr.push(domNode.attribs.src);
-                    return domNode;
+                console.log("unReadMessages: ", data);
+
+                setUnReadMessages([...data]);
+
+            } else if (res.status === 401) {
+                const tokenRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    credentials: "include"
+                });
+                if (tokenRes.status === 200) {
+                    const data = await tokenRes.json();
+                    setAccessToken(data.access_token);
+                    await fetchUnReadMessages(data.access_token);
+                } else {
+                    setLogout(true);
                 }
+            } else {
+                console.error(res.statusText);
             }
-        });
 
-        let newContent = content;
-
-        for(let elem of imagesNameArr){
-
-            const elemBlobClient = containerClient.getBlobClient(elem);
-            const elemBlob = await elemBlobClient.download();
-            const elemBlobBody = await elemBlob.blobBody;
-            const elemURL = URL.createObjectURL(elemBlobBody);
-
-            urlToSrc[elemURL] = elem;
-
-            newContent = newContent.replace(elem, elemURL);
         }
-
-        return newContent;
-
+        catch(e){
+            console.error(e);
+        }
     };
-    const fetchMessages = (accountId)=>{
-
-        fetch(import.meta.env.VITE_CHAT_SERVICE + "/" + accountId+'/'+account?.id, {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
-            },
-            credentials: "include"
-        })
-            .then(async (res) => {
-                if (res.status === 200) {
-                    const data = await res.json();
-                    const temp = [];
-
-                    for(let i =0;i<data.length;i++){
-                        const newContent = await injectImages(data[i].content);
-                        temp.push({
-                            ...data[i],
-                            content:newContent
-                        });
-                    }
-
-                    console.log("Messages: ", temp);
-
-                    setMessagesArr([...temp]);
-
-                } else if (res.status === 401) {
-                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
-                        method: "GET",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        credentials: "include"
-                    })
-                        .then(async (res) => {
-                            if (res.status === 200) {
-                                const data = await res.json();
-                                setAccessToken(data.access_token);
-                                fetchMessages(accountId);
-                            } else {
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
-                            }
-
-                        })
-                        .catch(err => console.error(err));
-                } else {
-                    throw new Error(res.statusText);
-                }
-
-            })
-            .catch(err => console.error(err));
-
-
-
-    };
-
-    const fetchUnReadMessages = ()=>{
-
-        fetch(import.meta.env.VITE_CHAT_SERVICE + "/message/unRead/"+account?.id, {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
-            },
-            credentials: "include"
-        })
-            .then(async (res) => {
-                if (res.status === 200) {
-                    const data = await res.json();
-
-
-                    console.log("unReadMessages: ", data);
-
-                    setUnReadMessages([...data]);
-
-                } else if (res.status === 401) {
-                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
-                        method: "GET",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        credentials: "include"
-                    })
-                        .then(async (res) => {
-                            if (res.status === 200) {
-                                const data = await res.json();
-                                setAccessToken(data.access_token);
-                                fetchUnReadMessages();
-                            } else {
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
-                            }
-
-                        })
-                        .catch(err => console.error(err));
-                } else {
-                    throw new Error(res.statusText);
-                }
-
-            })
-            .catch(err => console.error(err));
-
-    };
-
 
 
     useEffect(()=>{
         if(account){
-            setupStomp();
-            fetchUnReadMessages();
             setFriendsArr([...account.friendList]);
+            ( async ()=>{
+                setupStomp();
+                await fetchUnReadMessages();
+            })();
         }
 
-        return ()=>{
-            stompClient?.send(
+
+    },[account]);
+
+    useEffect(()=>{
+        if(logout){
+
+            stompClient.send(
                 "/chat/unAvailableFriend",
                 {},
                 JSON.stringify({
                     accountId:account?.id,
-                    friendList:friendsArr.map(friend=>friend.id)
+                    friendList:account?.friendList.map(friend=>friend.id)
                 })
             );
-            stompClient?.disconnect();
-            setStompClient(null);
-        };
+            stompClient.disconnect();
+            
+        }
+    },[logout]);
 
-    },[account]);
+    useEffect(()=>{
+        if(newMessage){
 
+            if(chatIsOpen){
+                if(newMessage.deleted){
+                    setMessagesArr(prevState => [...prevState.map(message=>message.id === newMessage.id?{
+                        ...newMessage
+                    }:message)]);
+                }
+                else{
+                    setMessagesArr(prevState => [...prevState, newMessage]);
+                }
 
+            }
+            else{
+                if(newMessage.deleted){
+                    setMessagesArr(prevState => [...prevState.map(message=>message.id === newMessage.id?{
+                        ...newMessage
+                    }:message)]);
+                }
+                else{
+                    setUnReadMessages(prevState => [...prevState, newMessage]);
+                }
 
+            }
+
+            setNewMessage(null);
+        }
+
+    },[newMessage]);
+
+if(!account){
+    return (<></>);
+}
 
 return(
     <div className="hs-dropdown inline-flex [--placement:top] [--auto-close:false] fixed left-20 bottom-0 z-50">
@@ -453,7 +407,7 @@ return(
             aria-labelledby="hs-dropup">
 
             <div
-                className={(chatIsOpen?"bg-gray-600  ":"")+"flex flex-col rounded-lg border-solid border-2 border-slate-500 w-80 h-full overflow-y-auto"}>
+                className={"flex flex-col rounded-lg border-solid border-2 border-slate-500 w-[22rem] h-full overflow-y-auto"}>
 
                 {
                     friendsTabIsOpen &&
@@ -461,7 +415,6 @@ return(
                         const friendUnReadMessages = unReadMessages.filter(message=>message.senderId === friend.id);
                         return(
                             <div key={`chat-${friend.id}`} className="rounded-t-lg flex items-center justify-center py-2 mt-2">
-
                                 <div className="flex items-center justify-end">
                                     <div className="w-10 h-10 overflow-hidden rounded-full">
                                         <img
@@ -470,11 +423,13 @@ return(
                                     </div>
                                     <h3
                                         onClick={()=>{
+                                            setFriendsTabIsOpen(false);
                                             setChatIsOpen(true);
                                             setChatFriend({
                                                 ...friend
                                             });
                                             fetchMessages(friend.id);
+                                            setUnReadMessages(prevState=> [...prevState.filter(message=>message.id!== friend.id)]);
                                         }}
                                         className="font-bold cursor-pointer c truncate w-36 block px-3 py-2 mx-1 mt-2 text-gray-700 transition-colors duration-300 transform rounded-md lg:mt-0 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                                         {friend.userName}</h3>
@@ -504,7 +459,7 @@ return(
 
                 {
                     chatIsOpen &&
-                    <div className="rounded-t-lg flex items-center justify-center py-2">
+                    <div className="rounded-t-lg flex items-center justify-center py-2 sticky top-0 bg-gray-600">
 
                         <div className="flex items-center justify-end">
                             <button
@@ -512,6 +467,7 @@ return(
                                     setChatIsOpen(false);
                                     setChatFriend(null);
                                     setFriendsTabIsOpen(true);
+                                    setMessagesArr([]);
                                 }}
                                 className="mx-2 inline-flex justify-center p-2 text-blue-600 rounded-full cursor-pointer hover:bg-blue-100 dark:text-blue-500 dark:hover:bg-gray-800">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" width="12" height="12" viewBox="0 0 12 12">
@@ -541,9 +497,9 @@ return(
 
                 <div className="flex-1 flex flex-col px-2 py-2 bg-gray-800">
                 {
-                    messagesArr.map((message, i)=>{
+                    messagesArr.map(message=>{
                         return (
-                            <Message key={`message-${i}`} message={message} setMessagesArr={setMessagesArr} accountId={account?.id} stompClient={stompClient}/>
+                            <Message key={`message-${message.id}`} messageProp={message} setUnReadMessages={setUnReadMessages} setMessagesArr={setMessagesArr} accountId={account?.id} stompClient={stompClient} containerClient={containerClient}/>
                         );
                     })
                 }
@@ -552,10 +508,10 @@ return(
 
                 {
                     chatIsOpen &&
-                    <div>
+                    <div className="sticky bottom-0">
 
 
-                        <form className={""}>
+                        <form>
 
                             <div className="flex items-center px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-700">
 

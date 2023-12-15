@@ -8,8 +8,7 @@ import Navbar from './components/Navbar.jsx';
 import Messenger from './components/Messenger.jsx';
 import './App.css';
 import 'preline';
-import {useCookies} from "react-cookie";
-import {BrowserRouter, Route, Routes} from "react-router-dom";
+import {useNavigate, Route, Routes} from "react-router-dom";
 import NewPasswordForm from "./components/NewPasswordForm.jsx";
 import EmailForm from "./components/EmailForm.jsx";
 import Test from "./components/Test.jsx";
@@ -20,6 +19,7 @@ import SockJS from "sockjs-client";
 import {Stomp} from "@stomp/stompjs";
 import {AccessTokenContext} from "./components/AccessTokenProvider.jsx";
 import axios from "axios";
+import {Toast} from 'flowbite-react'
 function App() {
     const [account,setAccount] = useState(null);
     const [notificationsArr, setNotificationsArr] = useState([]);
@@ -31,14 +31,59 @@ function App() {
     const [dangerFlag, setDangerFlag] = useState(false);
     const [notificationContent, setNotificationContent] = useState({});
     const [notificationFlag, setNotificationFlag] = useState(false);
+    const navigate = useNavigate();
 
 
-    const [,,removeCookie] = useCookies();
-    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
+
+    const {accessToken, setAccessToken, accessTokenIsNull, setAccessTokenIsNull, logout, setLogout} = useContext(AccessTokenContext);
+
 
     const [stompClient, setStompClient] = useState(null);
 
-    const fetchLoggedAccount = async ()=>{
+
+    const signoutRequest = async (accessTokenParam)=>{
+
+        try{
+            const res = await axios.post(import.meta.env.VITE_API_URL+"/logout",{
+                    access_token:accessTokenParam||accessToken
+                },
+                {
+                    withCredentials:true
+                });
+
+
+             if(res.status === 401){
+                const refRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN,{
+                    method:"GET",
+                    headers:{
+                        "Content-Type": "application/json",
+                    },
+                    credentials:"include"
+                });
+                if(refRes.status === 200){
+                    const data = await refRes.json();
+                    await signoutRequest(data.access_token);
+                }
+                else{
+                  console.error(refRes.statusText);
+                }
+            }
+            else if(res.status !== 200) {
+                console.error(res.statusText);
+
+            }
+        }
+        catch (e){
+            console.error(e);
+
+        }
+
+
+
+    };
+
+
+    const fetchLoggedAccount = async (accessTokenParam)=>{
 
         const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
         const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
@@ -46,7 +91,7 @@ function App() {
 
         try{
             const res = await axios.post(import.meta.env.VITE_API_URL+"/getUser",{
-                    access_token:accessToken
+                    access_token:accessTokenParam||accessToken
                 },
                 {
                     withCredentials:true
@@ -89,15 +134,12 @@ function App() {
                     credentials:"include"
                 });
                 if(refRes.status === 200){
-                    const data = await res.json();
+                    const data = await refRes.json();
                     setAccessToken(data.access_token);
-                    fetchLoggedAccount();
+                    return await fetchLoggedAccount(data.access_token);
                 }
                 else{
-                    removeCookie("refresh_token");
-                    removeCookie("JSESSIONID");
-                    setAccessToken(null);
-                    setAccount(null);
+                    setLogout(true);
                 }
 
 
@@ -113,7 +155,8 @@ function App() {
         }
 
     };
-    const fetchAccount = async (id)=>{
+    const fetchAccount = async (id, accessTokenParam)=>{
+        if(!id)return;
         const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
         const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
 
@@ -123,7 +166,7 @@ function App() {
                 method:"GET",
                 headers:{
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer  ${accessToken}`
+                    "Authorization": `Bearer ${accessTokenParam||accessToken}`
                 },
                 credentials:"include"
             });
@@ -163,15 +206,12 @@ function App() {
                     credentials:"include"
                 });
                if(refRes.status === 200){
-                   const data = await res.json();
+                   const data = await refRes.json();
                    setAccessToken(data.access_token);
-                   fetchAccount(id);
+                   return await fetchAccount(id, data.access_token);
                }
                else{
-                   removeCookie("refresh_token");
-                   removeCookie("JSESSIONID");
-                   setAccessToken(null);
-                   setAccount(null);
+                   setLogout(true);
                }
 
 
@@ -188,13 +228,13 @@ function App() {
 
     };
 
-    const fetchNotifications = async (id)=>{
+    const fetchNotifications = async (id, accessTokenParam)=>{
         try{
             const res = await fetch(import.meta.env.VITE_NOTIFICATIONS_SERVICE+'/notifications/'+id,{
                 method:"GET",
                 headers:{
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer  ${accessToken}`
+                    "Authorization": `Bearer ${accessTokenParam||accessToken}`
                 },
                 credentials:"include"
             });
@@ -242,15 +282,12 @@ function App() {
                     credentials:"include"
                 });
                 if(refRes.status === 200){
-                    const data = await res.json();
+                    const data = await refRes.json();
                     setAccessToken(data.access_token);
-                    await fetchNotifications(id);
+                    await fetchNotifications(id, data.access_token);
                 }
                 else{
-                    removeCookie("refresh_token");
-                    removeCookie("JSESSIONID");
-                    setAccessToken(null);
-                    setAccount(null);
+                    setLogout(true);
                 }
 
 
@@ -349,7 +386,11 @@ function App() {
                     account:notificationAccount
                 }, ...prevState])
 
-            });
+            },
+                {
+                    'auto-delete':true,
+                    'durable':true
+                });
 
 
         });
@@ -370,11 +411,17 @@ function App() {
 
         if(isAccepted){
             const newFriend = await fetchAccount(addingId);
+
             const newFriendArr = account?.friendList;
             newFriendArr.push(newFriend);
+
+            const newFollowerArr = account?.followerList;
+            newFollowerArr.push(newFriend.id);
+
             setAccount({
                 ...account,
-                friendList:newFriendArr
+                friendList:newFriendArr,
+                followerList:newFollowerList
             });
         }
 
@@ -423,100 +470,122 @@ function App() {
 
 
     useEffect(()=>{
-        // fetchLoggedAccount()
-        fetchAccount(1)
-             .then( async (res)=>{
-                 await fetchNotifications(res.id);
-                 await setupSTOMP(res.id);
-                 setAccount({
-                     ...res
-                 });
 
-             })
-             .catch(err=>console.error(err));
+        if(!accessTokenIsNull){
 
-        return ()=>{
-            stompClient?.disconnect();
-            setStompClient(null);
-        };
+            console.log("accessToken: ",accessToken);
 
-    },[]);
+            ( async ()=>{
+                const accountRes =  await fetchLoggedAccount();
+                setAccount({...accountRes});
+                await fetchNotifications(accountRes.id);
+                await setupSTOMP(accountRes.id);
+            })();
+
+        }
 
 
+    },[accessTokenIsNull]);
+
+    useEffect(()=>{
+        if(logout){
+            ( async ()=>{
+
+                await signoutRequest();
+                stompClient?.disconnect();
+                setAccount(null);
+                setAccessToken(null);
+                setAccessTokenIsNull(true);
+                navigate("/login");
+                setLogout(false);
+            })();
+        }
+    },[logout]);
 
 
 
   return (
-
-        <BrowserRouter>
-            <Navbar account={account} setAccount={setAccount} fetchAccount={fetchAccount} notificationsArr={notificationsArr} respondToFriendRequest={respondToFriendRequest} />
-            {/*<Messenger account={account} setDangerToast={setDangerToast} />*/}
+      <>
+            <Navbar account={account} setAccount={setAccount} setNotificationsStompClient={setStompClient} fetchAccount={fetchAccount} notificationsArr={notificationsArr} setNotificationsArr={setNotificationsArr} respondToFriendRequest={respondToFriendRequest} />
+            <Messenger account={account} />
           <Routes>
-
-              <Route path={"/"} element={<Home account={account} fetchAccount={fetchAccount} notificationStompClient={stompClient} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast}/>}/>
               <Route path={"/signup"} element={<SignUp setInfoToast={setInfoToast} />}/>
-              <Route path={"/login"} element={<Login setAccessToken={setAccessToken}/>}/>
-              <Route path={"/post/:id"} element={<PostPage account={account} fetchAccount={fetchAccount} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast} />}/>
-              <Route path={"/profile/:id"} element={<Profile account={account} setAccount={setAccount} fetchAccount={fetchAccount} notificationStompClient={stompClient} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast} />}/>
-              <Route path={"/settings"} element={<Settings account={account} fetchAccount={fetchAccount} setAccount={setAccount} setSuccessToast={setSuccessToast} setInfoToast={setInfoToast} setDangerToast={setDangerToast} />}/>
+              <Route path={"/login"} element={<Login setAccount={setAccount} fetchAccount={fetchLoggedAccount} setAccessToken={setAccessToken} setAccessTokenIsNull={setAccessTokenIsNull}/>}/>
+              <Route path={"/forgetPassword"} element={<EmailForm setInfoToast={setInfoToast} setDangerToast={setDangerToast}  />}/>
               <Route path={"/redirect/:type"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
               <Route path={"/resetPassword"} element={<NewPasswordForm setSuccessToast={setSuccessToast}/>}/>
-              <Route path={"/forgetPassword"} element={<EmailForm setInfoToast={setInfoToast} setDangerToast={setDangerToast}  />}/>
-              <Route path={"/test/:type"} element={<Test fetchAccount={fetchAccount} setNotificationsArr={setNotificationsArr} setNotificationToast={setNotificationToast}/>}/>
+              <Route path={"/test"} element={<Test fetchAccount={fetchAccount} setNotificationToast={setNotificationToast}/>}/>
+
+              {
+                  Boolean(account) &&
+                  <>
+                      <Route path={"/"} element={<Home account={account} fetchAccount={fetchAccount} notificationStompClient={stompClient} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast}/>}/>
+                      <Route path={"/post/:id"} element={<PostPage account={account} fetchAccount={fetchAccount} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast} />}/>
+                      <Route path={"/profile/:id"} element={<Profile account={account} setAccount={setAccount} fetchAccount={fetchAccount} notificationStompClient={stompClient} setSuccessToast={setSuccessToast} setDangerToast={setDangerToast} />}/>
+                      <Route path={"/settings"} element={<Settings account={account} fetchAccount={fetchAccount} setAccount={setAccount} setSuccessToast={setSuccessToast} setInfoToast={setInfoToast} setDangerToast={setDangerToast} />}/>
+
+                  </>
+              }
+
           </Routes>
 
             {
                 notificationFlag &&
-                <div
-                     onClick={()=>{
+                <Toast>
 
-                     }}
-                     id="notification-toast"
-                     className="hs-removing:translate-x-5 hs-removing:opacity-0 transition duration-300 fixed bottom-5 right-5 w-[18rem] bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700"
-                     role="alert">
-                    <div className="flex p-4">
-                        <div className="flex-shrink-0">
-                            <img className="inline-block h-10 w-10 rounded-full"
-                                 src={notificationContent.url}
-                                 alt="Image Description"/>
-                            <button
-                                    onClick={()=>toastsClear()}
-                                    data-hs-remove-element='#notification-toast' type="button"
-                                    className="absolute top-3 end-3 inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-gray-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-white">
-                                <span className="sr-only">Close</span>
-                                <svg className="flex-shrink-0 w-4 h-4" xmlns="http://www.w3.org/2000/svg"
-                                     viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                                     strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M18 6 6 18"/>
-                                    <path d="m6 6 12 12"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <div className={"ms-4 me-5"} >
-                            <h3 className="text-gray-800 font-medium text-sm dark:text-white">
-                                <span className="font-semibold">{notificationContent.userName}</span> {notificationContent.text}
-                            </h3>
-                            {
-                                Boolean(notificationContent.type === "AddFriendNotification") &&
-                                <div className="flex space-x-3 mt-1">
-                                    <button
-                                        data-hs-remove-element='#notification-toast'
-                                        onClick={()=>respondToFriendRequest(notificationContent.addingId, true)}
-                                        type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
-                                        Accept
-                                    </button>
-                                    <button
-                                        data-hs-remove-element='#notification-toast'
-                                        onClick={()=>respondToFriendRequest(notificationContent.addingId, false)}
-                                        type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
-                                        Reject
-                                    </button>
-                                </div>
-                            }
+                    <div
+                        className="fixed bottom-5 right-5 w-[18rem] bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-gray-800 dark:border-gray-700"
+                        role="alert">
+                        <div className="flex p-4">
+                            <div className="flex-shrink-0">
+                                <img className="inline-block h-10 w-10 rounded-full"
+                                     src={notificationContent.url}
+                                     alt="Image Description"/>
+                            </div>
+                            <div className={"ms-4 me-5"} >
+                                <h3
+                                    onClick={()=>{
+                                        if(notificationContent.type !== "AddFriendNotification" && notificationContent.type !== "NewMessageNotification"){
+                                            navigate("/post/"+notificationContent.postId);
+                                            setNotificationFlag(false);
+                                        }
+
+                                    }}
+                                    className={
+                                        (notificationContent.type !== "AddFriendNotification" && notificationContent.type !== "NewMessageNotification"?
+                                            "cursor-pointer ":"")+
+                                    "text-gray-800 font-medium text-sm dark:text-white"}>
+                                    <span className="font-semibold">{notificationContent.userName}</span> {notificationContent.text}
+                                </h3>
+                                {
+                                    Boolean(notificationContent.type === "AddFriendNotification" && notificationContent.request) &&
+                                    <div className="flex space-x-3 mt-1">
+                                        <button
+                                            onClick={()=>{
+                                                setNotificationFlag(false);
+                                                respondToFriendRequest(notificationContent.addingId, true);
+
+                                            }}
+                                            type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
+                                            Accept
+                                        </button>
+                                        <button
+                                            onClick={()=>{
+                                                setNotificationFlag(false);
+                                                respondToFriendRequest(notificationContent.addingId, false);
+
+                                            }}
+                                            type="button" className="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:text-blue-800 dark:text-blue-500 dark:focus:text-blue-400">
+                                            Reject
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                            <Toast.Toggle onDismiss={()=>setNotificationFlag(false)}/>
                         </div>
                     </div>
-                </div>
 
+                </Toast>
 
             }
 
@@ -525,96 +594,55 @@ function App() {
 
             {
                 successFlag &&
-                <div
-                    id={"success-toast"}
-                    className="hs-removing:translate-x-5 hs-removing:opacity-0 transition duration-300 fixed bottom-5 right-5 w-[18rem] bg-teal-100 border border-teal-200 text-sm text-teal-800 rounded-lg dark:bg-teal-800/10 dark:border-teal-900 dark:text-teal-500"
-                    role="alert">
-                    <div className="flex p-4">
-                        {successText}
-                        <div className="ms-auto">
-                            <button
-                                onClick={()=>toastsClear()}
-                                data-hs-remove-element="#success-toast"
-                                type="button"
-                                className="inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-teal-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-teal-200">
-                                <span className="sr-only">Close</span>
-                                <svg className="flex-shrink-0 w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                     viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-                                     strokeLinejoin="round">
-                                    <path d="M18 6 6 18"/>
-                                    <path d="m6 6 12 12"/>
-                                </svg>
-                            </button>
+                <Toast>
+                    <div
+                        className="fixed bottom-5 right-5 w-[18rem] bg-teal-100 border border-teal-200 text-sm text-teal-800 rounded-lg dark:bg-teal-800/10 dark:border-teal-900 dark:text-teal-500"
+                        role="alert">
+                        <div className="flex p-4">
+                            {successText}
+                            <div className="ms-auto">
+                                <Toast.Toggle onDismiss={()=>setSuccessFlag(false)}/>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </Toast>
             }
 
             {
                 infoFlag &&
-                <div
-                    id={"info-toast"}
-                    className="hs-removing:translate-x-5 hs-removing:opacity-0 transition duration-300 fixed bottom-5 right-5 w-[18rem] bg-yellow-100 border border-yellow-200 text-sm text-yellow-800 rounded-lg dark:bg-yellow-800/10 dark:border-yellow-900 dark:text-yellow-500"
-                    role="alert">
-                    <div className="flex p-4">
-                        {infoText}
-                        <div className="ms-auto">
-                            <button
-                                onClick={()=>toastsClear()}
-                                data-hs-remove-element="#info-toast"
-                                type="button"
-                                className="inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-yellow-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-yellow-200">
-                                <span className="sr-only">Close</span>
-                                <svg className="flex-shrink-0 w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24"
-                                     height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                                     strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M18 6 6 18"/>
-                                    <path d="m6 6 12 12"/>
-                                </svg>
-                            </button>
+                <Toast>
+                    <div
+                        className="fixed bottom-5 right-5 w-[18rem] bg-yellow-100 border border-yellow-200 text-sm text-yellow-800 rounded-lg dark:bg-yellow-800/10 dark:border-yellow-900 dark:text-yellow-500"
+                        role="alert">
+                        <div className="flex p-4">
+                            {infoText}
+                            <div className="ms-auto">
+                                <Toast.Toggle onDismiss={()=>setInfoFlag(false)} />
+                            </div>
                         </div>
                     </div>
-                </div>
+                </Toast>
 
             }
 
 
             {
                 dangerFlag &&
-                <div
-                    id={"danger-toast"}
-                    className="hs-removing:translate-x-5 hs-removing:opacity-0 transition duration-300 fixed bottom-5 right-5 w-[18rem] bg-red-100 border border-red-200 text-sm text-red-800 rounded-lg dark:bg-red-800/10 dark:border-red-900 dark:text-red-500"
-                    role="alert">
-                    <div className="flex p-4">
-                        {dangerText}
-                        <div className="ms-auto">
-                            <button
-                                onClick={()=>toastsClear()}
-                                data-hs-remove-element="#danger-toast"
-                                type="button"
-                                className="inline-flex flex-shrink-0 justify-center items-center h-5 w-5 rounded-lg text-red-800 opacity-50 hover:opacity-100 focus:outline-none focus:opacity-100 dark:text-red-200">
-                                <span className="sr-only">Close</span>
-                                <svg className="flex-shrink-0 w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24"
-                                     height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                                     strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M18 6 6 18"/>
-                                    <path d="m6 6 12 12"/>
-                                </svg>
-                            </button>
+                <Toast>
+                    <div
+                        className="fixed bottom-5 right-5 w-[18rem] bg-red-100 border border-red-200 text-sm text-red-800 rounded-lg dark:bg-red-800/10 dark:border-red-900 dark:text-red-500"
+                        role="alert">
+                        <div className="flex p-4">
+                            {dangerText}
+                            <div className="ms-auto">
+                                <Toast.Toggle onDismiss={()=>setDangerFlag(false)} />
+                            </div>
                         </div>
                     </div>
-                </div>
+                </Toast>
             }
 
-
-
-
-
-
-
-
-
-        </BrowserRouter>
+      </>
 
   )
 }

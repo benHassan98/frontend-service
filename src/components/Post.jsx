@@ -66,8 +66,7 @@ function Post({
     ];
 
 
-    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
-    const [, , removeCookie] = useCookies();
+    const {accessToken, setAccessToken, accessTokenIsNull, setAccessTokenIsNull, logout, setLogout} = useContext(AccessTokenContext);
     const navigate = useNavigate();
 
     const [stompClient, setStompClient] = useState(null);
@@ -140,6 +139,18 @@ function Post({
 
     });
 
+    const uploadImages = async (imageList)=>{
+
+        for(let i = 0;i<imageList.length;i++){
+
+            const image = imageList[i].file;
+            const imageId = imageList[i].id;
+
+            const blockBlobClient = containerClient.getBlockBlobClient(imageId);
+            await blockBlobClient.upload(image,image.size);
+        }
+
+    };
     const isImageExists = (url, content) => {
         let exists = false;
 
@@ -157,17 +168,15 @@ function Post({
         return exists;
     };
 
-    const deletePostRequest = (e) => {
+    const deletePostRequest = (e, accessTokenParam) => {
+        e.preventDefault();
 
-        if (e) {
-            e.preventDefault();
-        }
 
         fetch(import.meta.env.VITE_POST_SERVICE + "/" + post.id, {
             method: "DELETE",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             credentials: "include"
         })
@@ -191,12 +200,9 @@ function Post({
                             if (res.status === 200) {
                                 const data = await res.json();
                                 setAccessToken(data.access_token);
-                                deletePostRequest();
+                                deletePostRequest(e, data.access_token);
                             } else {
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
+                                setLogout(true);
                             }
 
                         })
@@ -210,11 +216,9 @@ function Post({
             .catch(err => console.error(err));
 
     };
-    const updatePostRequest = (e) => {
+    const updatePostRequest = async (e, accessTokenParam) => {
 
-        if (e) {
-            e.preventDefault();
-        }
+        e.preventDefault();
 
         let html = sanitizeHtml(editPostContent, defaultSanitizeOptions);
         const urlToSrc = postArr[0].currPost.urlToSrc;
@@ -232,88 +236,83 @@ function Post({
 
         const updatedPost = {
             ...post,
+            likesList:likesArr.map(likeAccount=>likeAccount.id),
+            commentsList:commentsArr,
             sharedFromPostJson: JSON.stringify(post.sharedFromPost),
             content: html,
-            edited: true,
-            imageList
+            edited: true
         };
+
+
+        if(!accessTokenParam){
+            await uploadImages(imageList);
+        }
+
         const formData = new FormData();
 
         Object.entries(updatedPost).forEach(([k, v]) => {
 
-            if (k === 'imageList') {
-                v.forEach(image => {
-                    formData.append("idList", image.id);
-                    formData.append("fileList", image.file);
-                });
-
-            } else {
-                formData.append(k, v);
-            }
-
+            formData.append(k, v);
 
         });
 
 
         // console.log("html: ",html);
-        // console.log("formData: ",formData);
+        console.log("update formData: ",formData);
         axios({
             method: 'PUT',
             url: import.meta.env.VITE_POST_SERVICE + "/update",
             data: formData,
             headers: {
                 'Content-Type': 'multipart/form-data',
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             withCredentials: true
         }).then(async (res) => {
-            if (res.status === 200) {
-                const data = res.data;
-                setPostStates(data);
-                setSuccessToast("Post Edited Successfully");
+            const data = res.data;
+            setPostStates(data);
+            setSuccessToast("Post Edited Successfully");
 
-                editPostEditor.commands.clearContent();
-                setEditPostContent("");
-                setUpdatePostImageList([]);
+            editPostEditor.commands.clearContent();
+            setEditPostContent("");
+            setUpdatePostImageList([]);
 
-            } else if (res.status === 401) {
-
-                fetch(import.meta.env.VITE_REFRESH_TOKEN, {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    credentials: "include"
-                })
-                    .then(async (res) => {
-                        if (res.status === 200) {
-                            const data = await res.json();
-                            setAccessToken(data.access_token);
-                            updatePostRequest();
-                        } else {
-                            removeCookie("refresh_token");
-                            removeCookie("JSESSIONID");
-                            setAccessToken(null);
-                            navigate("/login");
-                        }
-
-                    })
-                    .catch(err => console.error(err));
-            } else {
-                setDangerToast("An Error ocurred");
-                throw new Error(res.statusText);
-            }
 
         })
-            .catch(err => console.error(err));
+            .catch(err => {
+                if (err.response.status === 401) {
+
+                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
+                        method: "GET",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        credentials: "include"
+                    })
+                        .then(async (res) => {
+                            if (res.status === 200) {
+                                const data = await res.json();
+                                setAccessToken(data.access_token);
+                                await updatePostRequest(e, data.access_token);
+                            } else {
+                                setLogout(true);
+                            }
+
+                        })
+                        .catch(err => console.error(err));
+                } else {
+                    setDangerToast("An Error ocurred");
+                    console.error(err);
+                }
+
+            });
 
 
     };
-    const sharePostRequest = (isPublic, e) => {
+    const sharePostRequest = async (isPublic, e, accessTokenParam) => {
 
-        if (e) {
-            e.preventDefault();
-        }
+        e.preventDefault();
+
 
         const friendsArr = [];
         let selectedCnt = 0;
@@ -349,13 +348,15 @@ function Post({
             URL.revokeObjectURL(image.url);
         });
 
+        if(!accessTokenParam){
+            await uploadImages(imageList);
+        }
 
         const formData = new FormData();
 
         const sharedPost = {
             accountId: account?.id,
             content,
-            imageList,
             sharedFromPostJson: JSON.stringify(post),
             visibleToFollowers: JSON.stringify(visibleToFollowers),
             friendsVisibilityType: JSON.stringify(friendsVisibilityType),
@@ -365,16 +366,8 @@ function Post({
 
 
         Object.entries(sharedPost).forEach(([k, v]) => {
-            if (k === 'imageList') {
-                v.forEach(image => {
-                    formData.append("idList", image.id);
-                    formData.append("fileList", image.file);
-                });
 
-            } else {
-                formData.append(k, v);
-            }
-
+            formData.append(k, v);
 
         });
 
@@ -386,56 +379,53 @@ function Post({
             data: formData,
             headers: {
                 'Content-Type': 'multipart/form-data',
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             withCredentials: true
         }).then(async (res) => {
-            if (res.status === 200) {
-                const data = res.data;
-                setSuccessToast("Post Shared just Now");
+            const data = res.data;
+            setSuccessToast("Post Shared just Now");
 
-                if(setPostsArr){
-                    setPostsArr(prevState=>[data, ...prevState]);
-                }
-
-                publicSharedPostEditor.commands.clearContent();
-                privateSharedPostEditor.commands.clearContent();
-                setPublicSharedContent("");
-                setPrivateSharedContent("");
-                setPublicSharedPostImageList([]);
-                setPrivateSharedPostImageList([]);
-            } else if (res.status === 401) {
-                fetch(import.meta.env.VITE_REFRESH_TOKEN, {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    credentials: "include"
-                })
-                    .then(async (res) => {
-                        if (res.status === 200) {
-                            const data = await res.json();
-                            setAccessToken(data.access_token);
-                            sharePostRequest(isPublic);
-                        } else {
-                            removeCookie("refresh_token");
-                            removeCookie("JSESSIONID");
-                            setAccessToken(null);
-                            navigate("/login");
-                        }
-
-                    })
-                    .catch(err => console.error(err));
-            } else {
-                setDangerToast("An Error ocurred");
-                throw new Error(res.statusText);
+            if(setPostsArr){
+                setPostsArr(prevState=>[data, ...prevState]);
             }
 
+            publicSharedPostEditor.commands.clearContent();
+            privateSharedPostEditor.commands.clearContent();
+            setPublicSharedContent("");
+            setPrivateSharedContent("");
+            setPublicSharedPostImageList([]);
+            setPrivateSharedPostImageList([]);
+
         })
-            .catch(err => console.error(err));
+            .catch(err => {
+                if (err.response.status === 401) {
+                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
+                        method: "GET",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        credentials: "include"
+                    })
+                        .then(async (res) => {
+                            if (res.status === 200) {
+                                const data = await res.json();
+                                setAccessToken(data.access_token);
+                                await sharePostRequest(isPublic, e, data.access_token);
+                            } else {
+                                setLogout(true);
+                            }
+
+                        })
+                        .catch(err => console.error(err));
+                } else {
+                    setDangerToast("An Error ocurred");
+                    console.error(err);
+                }
+
+            });
 
     };
-
     const commentContentToHtml = async (content) => {
 
         const imagesNameArr = [];
@@ -463,12 +453,9 @@ function Post({
 
         return newContent;
     };
+    const newCommentRequest = async (e, accessTokenParam) => {
 
-    const newCommentRequest = (e) => {
-
-        if (e) {
-            e.preventDefault();
-        }
+        e.preventDefault();
 
         let content = sanitizeHtml(commentContent, defaultSanitizeOptions);
 
@@ -479,25 +466,20 @@ function Post({
             URL.revokeObjectURL(image.url);
         });
 
+        if(!accessTokenParam){
+            await uploadImages(imageList);
+        }
+
 
         const formData = new FormData();
         const comment = {
             accountId: account?.id,
             content,
-            postJson: JSON.stringify(post),
-            imageList
+            postJson: JSON.stringify(post)
         };
         Object.entries(comment).forEach(([k, v]) => {
-            if (k === 'imageList') {
-                v.forEach(image => {
-                    formData.append("idList", image.id);
-                    formData.append("fileList", image.file);
-                });
 
-            } else {
-                formData.append(k, v);
-            }
-
+            formData.append(k, v);
 
         });
 
@@ -509,25 +491,24 @@ function Post({
             data: formData,
             headers: {
                 'Content-Type': 'multipart/form-data',
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             withCredentials: true
         })
             .then(async (res) => {
+                const data = res.data;
+                console.log("newCommentReq: ",data);
 
-                if (res.status === 200) {
-                    const data = res.data;
-                    const newContent = await commentContentToHtml(data.content);
+                setCommentsArr(prevState => [...prevState, data]);
 
-                    setCommentsArr(prevState => [...prevState, {
-                        ...data,
-                        content: newContent
-                    }]);
+                commentEditor.commands.clearContent();
+                setCommentContent("");
+                setNewCommentImageList([]);
 
-                    commentEditor.commands.clearContent();
-                    setCommentContent("");
-                    setNewCommentImageList([]);
-                } else if (res.status === 401) {
+
+            })
+            .catch(err => {
+                if (err.response.status === 401) {
 
                     fetch(import.meta.env.VITE_REFRESH_TOKEN, {
                         method: "GET",
@@ -540,12 +521,9 @@ function Post({
                             if (res.status === 200) {
                                 const data = await res.json();
                                 setAccessToken(data.access_token);
-                                newCommentRequest();
+                                await newCommentRequest(e, data.access_token);
                             } else {
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
+                                setLogout(true);
                             }
 
                         })
@@ -553,12 +531,12 @@ function Post({
 
                 } else {
                     setDangerToast("An Error Ocurred");
-                    throw new Error(res.statusText);
+                    console.error(err);
                 }
 
 
-            })
-            .catch(err => console.error(err));
+
+            });
 
 
     };
@@ -579,6 +557,7 @@ function Post({
         const postContentArr = [];
         let currPost = post;
         while (currPost) {
+            console.log("currPost: ",currPost);
             const isShared = Boolean(currPost.sharedFromPost);
             const isEdited = Boolean(currPost.edited);
             const isDeleted = Boolean(currPost.deleted);
@@ -586,7 +565,7 @@ function Post({
 
             const imagesNameArr = [];
             const urlToSrc = {};
-
+            console.log("currPost.content: ",currPost.content);
             parse(currPost.content, {
                 replace(domNode) {
                     if (domNode.name === "img") {
@@ -633,7 +612,6 @@ function Post({
 
         return postContentArr;
     };
-
     const setPostStates = async (data) => {
 
         const tempPostsArr = await extractPostContent({...data});
@@ -661,52 +639,48 @@ function Post({
         setLikesArr([...tempLikesArr]);
         setCommentsArr([...data.commentsList]);
     };
-    const fetchPost = () => {
+    const fetchPost = async (accessTokenParam) => {
 
-        fetch(import.meta.env.VITE_POST_SERVICE + "/" + id, {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
-            },
-            credentials: "include"
-        })
-            .then(async (res) => {
-                if (res.status === 200) {
-                    const data = await res.json();
+        try{
+            const res = await fetch(import.meta.env.VITE_POST_SERVICE + "/" + id, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${accessTokenParam||accessToken}`
+                },
+                credentials: "include"
+            });
+            if (res.status === 200) {
+                const data = await res.json();
 
-                    console.log("data: ", data);
+                console.log("data: ", data);
 
-                    setPostStates(data);
-                } else if (res.status === 401) {
-                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
-                        method: "GET",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        credentials: "include"
-                    })
-                        .then(async (res) => {
-                            if (res.status === 200) {
-                                const data = await res.json();
-                                setAccessToken(data.access_token);
-                                fetchPost();
-                            } else {
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
-                            }
-
-                        })
-                        .catch(err => console.error(err));
+                setPostStates(data);
+            } else if (res.status === 401) {
+              const tokenRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    credentials: "include"
+                });
+                if (tokenRes.status === 200) {
+                    const data = await tokenRes.json();
+                    setAccessToken(data.access_token);
+                    await fetchPost(data.access_token);
                 } else {
-                    throw new Error(res.statusText);
+                    setLogout(true);
                 }
+            } else {
+                console.error(res.statusText);
+            }
 
-            })
-            .catch(err => console.error(err));
 
+
+        }
+        catch(e){
+            console.error(e);
+        }
 
     };
     const shareBtnContent = <div
@@ -736,20 +710,22 @@ function Post({
 
     useEffect(() => {
 
+            ( async ()=>{
+                if (!postProp){
+                    await fetchPost();
+                }
+                else{
+                    await setPostStates(postProp);
+                }
 
-        if (!postProp)
-            fetchPost();
-        else {
-            setPostStates(postProp);
-        }
+            })();
+
 
     }, []);
 
     useEffect(() => {
         console.log("setStomp Account: ", account);
-        if (!account) {
-            return;
-        }
+
         let socket = new SockJS(import.meta.env.VITE_POST_SERVICE + "/post/websocket");
         let stompClient = Stomp.over(socket);
         stompClient.connect({}, function (frame) {
@@ -807,11 +783,17 @@ function Post({
         setStompClient(stompClient);
 
         return ()=>{
-            stompClient.disconnect();
-            setStompClient(null);
+            stompClient?.disconnect();
         };
 
-    }, [account]);
+
+    }, [accessTokenIsNull]);
+
+    useEffect(()=>{
+        if(logout){
+            stompClient.disconnect();
+        }
+    },[logout]);
 
 
     return (
@@ -920,7 +902,10 @@ function Post({
                                                         />
 
                                                         <button
-                                                            onClick={(e) => updatePostRequest(e)}
+                                                            onClick={(e) => {
+                                                                updatePostRequest(e);
+                                                                setEditModal(false);
+                                                            }}
                                                             className="px-8 py-2.5 leading-5 text-white transition-colors duration-300 transform bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:bg-gray-600">Edit
                                                         </button>
                                                     </div>
@@ -1141,9 +1126,11 @@ function Post({
                                                            }}
                                                     />
                                                     <button
-                                                        onClick={(e) => sharePostRequest(true, e)}
-                                                        data-hs-overlay={`#shareModal1-${id}`}
-                                                        className="hs-dropdown-toggle px-8 py-2.5 leading-5 text-white transition-colors duration-300 transform bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:bg-gray-600">Share
+                                                        onClick={(e) => {
+                                                            sharePostRequest(true, e);
+                                                            setPublicShareModal(false);
+                                                        }}
+                                                        className="px-8 py-2.5 leading-5 text-white transition-colors duration-300 transform bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:bg-gray-600">Share
                                                     </button>
                                                 </div>
                                             </form>
@@ -1288,7 +1275,10 @@ function Post({
                                                            }}
                                                     />
                                                     <button
-                                                        onClick={e => sharePostRequest(false, e)}
+                                                        onClick={e => {
+                                                            sharePostRequest(false, e);
+                                                            setPrivateShareModal(false);
+                                                        }}
                                                         className="px-8 py-2.5 leading-5 text-white transition-colors duration-300 transform bg-gray-700 rounded-md hover:bg-gray-600 focus:outline-none focus:bg-gray-600">Share
                                                     </button>
                                                 </div>

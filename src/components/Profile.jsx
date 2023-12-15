@@ -11,6 +11,7 @@ import Post from "./Post.jsx";
 import axios from "axios";
 import parse from "html-react-parser";
 import {Modal, Tooltip} from "flowbite-react";
+import {BlobServiceClient} from "@azure/storage-blob";
 
 function Profile({account, setAccount,  fetchAccount, notificationStompClient, setSuccessToast, setDangerToast}){
 
@@ -36,14 +37,15 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
     ];
 
 
-    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
-    const [,,removeCookie] = useCookies();
-    const navigate = useNavigate();
+    const {accessToken, setAccessToken, setLogout} = useContext(AccessTokenContext);
+
 
     const friendsRef = useRef();
 
     const [postModal, setPostModal] = useState(false);
 
+    const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
+    const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
     const defaultSanitizeOptions = {
         allowedTags: [ 'img', 'div', 'p' ],
         allowedAttributes: {
@@ -82,8 +84,9 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
 
         return exists;
     };
-    const newPostRequest = (isPublic, e)=>{
-        if(e){e.preventDefault();}
+    const newPostRequest = async (isPublic, e, accessTokenParam)=>{
+        e.preventDefault();
+
         let content = sanitizeHtml(newPostContent,defaultSanitizeOptions);
 
 
@@ -116,6 +119,19 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             URL.revokeObjectURL(image.url);
         });
 
+        if(!accessTokenParam){
+
+            for(let i = 0;i<imageList.length;i++){
+
+                const image = imageList[i].file;
+                const imageId = imageList[i].id;
+
+                const blockBlobClient = containerClient.getBlockBlobClient(imageId);
+                await blockBlobClient.upload(image,image.size);
+            }
+
+        }
+
 
         const formData = new FormData();
         const newPost = {
@@ -123,22 +139,11 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             content,
             visibleToFollowers,
             friendsVisibilityType,
-            visibleToFriendList,
-            imageList
+            visibleToFriendList
         };
         Object.entries(newPost).forEach(([k,v])=>{
-            if(k === 'imageList'){
-                v.forEach(image=>{
-                    formData.append("idList",image.id);
-                    formData.append("fileList",image.file);
-                });
 
-            }
-            else{
-                formData.append(k,v);
-            }
-
-
+            formData.append(k,v);
 
         });
 
@@ -150,27 +155,29 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             data: formData,
             headers: {
                 'Content-Type': 'multipart/form-data',
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             withCredentials:true
         })
             .then( async (res)=>{
 
-                if(res.status === 200){
-                    const data = res.data;
+                const data = res.data;
 //public or private
-                    if(data.visibleToFollowers&& !data.friendsVisibilityType){
-                        setPostsArr(prevState => [data,...prevState]);
-                    }
-
-                    newPostEditor.commands.clearContent();
-                    setNewPostContent("");
-                    setNewPostImageList([]);
-                    setNewPostLoader(false);
-
+                if(data.visibleToFollowers&& !data.friendsVisibilityType){
+                    setPostsArr(prevState => [data,...prevState]);
                 }
 
-                else if(res.status === 401){
+                newPostEditor.commands.clearContent();
+                setNewPostContent("");
+                setNewPostImageList([]);
+                setNewPostLoader(false);
+
+
+
+
+            })
+            .catch(err=>{
+                if(err.response.status === 401){
 
                     fetch(import.meta.env.VITE_REFRESH_TOKEN,{
                         method:"GET",
@@ -183,13 +190,10 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                             if(res.status === 200){
                                 const data = await res.json();
                                 setAccessToken(data.access_token);
-                                newPostRequest(isPublic);
+                                await newPostRequest(isPublic, e, data.access_token);
                             }
                             else{
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
+                                setLogout(true);
                             }
 
                         })
@@ -198,14 +202,10 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                 }
                 else {
                     setDangerToast("An Error Ocurred");
-                    throw new Error(res.statusText);
+                    console.error(err);
                 }
 
-
-
-
-            })
-            .catch(err=>console.error(err));
+            });
 
     };
     const friendRequest = ()=>{
@@ -221,9 +221,10 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                 isAccepted:false
             }));
 
+        setFriendRequestInProcess(true);
 
     };
-    const unFriendRequest = ()=>{
+    const unFriendRequest = (accessTokenParam)=>{
         fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/unFriend",{
             method:"POST",
             body:JSON.stringify({
@@ -232,7 +233,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             }),
             headers:{
                 "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             credentials:"include"
         })
@@ -258,13 +259,10 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                             if(res.status === 200){
                                 const data = await res.json();
                                 setAccessToken(data.access_token);
-                                unFriendRequest();
+                                unFriendRequest(data.access_token);
                             }
                             else{
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
+                                setLogout(true);
                             }
 
                         })
@@ -278,7 +276,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             .catch(err=>console.error(err));
 
     };
-    const followRequest = ()=>{
+    const followRequest = (accessTokenParam)=>{
 
         fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/follow",{
             method:"POST",
@@ -288,13 +286,13 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             }),
             headers:{
                 "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             credentials:"include"
         })
             .then(async (res)=>{
                 if(res.status === 200){
-                    const newFollowerList = [...account?.followerList, profileAccount];
+                    const newFollowerList = [...account?.followerList, id];
 
                     setAccount({
                         ...account,
@@ -314,13 +312,10 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                             if(res.status === 200){
                                 const data = await res.json();
                                 setAccessToken(data.access_token);
-                                followRequest();
+                                followRequest(data.access_token);
                             }
                             else{
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
+                                setLogout(true);
                             }
 
                         })
@@ -334,7 +329,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             .catch(err=>console.error(err));
 
     };
-    const unFollowRequest = ()=>{
+    const unFollowRequest = (accessTokenParam)=>{
         fetch(import.meta.env.VITE_ACCOUNT_SERVICE+"/unFollow",{
             method:"POST",
             body:JSON.stringify({
@@ -343,13 +338,13 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             }),
             headers:{
                 "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             credentials:"include"
         })
             .then(async (res)=>{
                 if(res.status === 200){
-                    const newFollowerList = account?.followerList.filter(follower=>follower.id !== profileAccount?.id);
+                    const newFollowerList = account?.followerList.filter(follower=> (follower.id || follower) !== profileAccount?.id);
 
                     setAccount({
                         ...account,
@@ -369,13 +364,10 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                             if(res.status === 200){
                                 const data = await res.json();
                                 setAccessToken(data.access_token);
-                                unFollowRequest();
+                                unFollowRequest(data.access_token);
                             }
                             else{
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
+                                setLogout(true);
                             }
 
                         })
@@ -388,105 +380,94 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
             })
             .catch(err=>console.error(err));
     };
-    const fetchProfilePosts = ()=>{
+    const fetchProfilePosts = async (accessTokenParam)=>{
 
-        fetch(import.meta.env.VITE_POST_SERVICE+"/profile/"+id,{
-            method:"GET",
-            headers:{
-                "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
-            },
-            credentials:"include"
-        })
-            .then(async (res)=>{
-                if(res.status === 200){
-                    const data = await res.json();
+        try{
+            const res = await fetch(import.meta.env.VITE_POST_SERVICE+"/profile/"+id,{
+                method:"GET",
+                headers:{
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${accessTokenParam||accessToken}`
+                },
+                credentials:"include"
+            });
+            if(res.status === 200){
+                const data = await res.json();
 
-                    console.log("data: ",data);
+                console.log("data: ",data);
 
-                    setPostsArr([...data.reverse()]);
+                setPostsArr([...data.reverse()]);
 
-                }
-                else if(res.status === 401){
-                    fetch(import.meta.env.VITE_REFRESH_TOKEN,{
-                        method:"GET",
-                        headers:{
-                            "Content-Type": "application/json",
-                        },
-                        credentials:"include"
-                    })
-                        .then(async (res)=>{
-                            if(res.status === 200){
-                                const data = await res.json();
-                                setAccessToken(data.access_token);
-                                fetchProfilePosts(id);
-                            }
-                            else{
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
-                            }
-
-                        })
-                        .catch(err=>console.error(err));
+            }
+            else if(res.status === 401){
+              const tokenRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN,{
+                    method:"GET",
+                    headers:{
+                        "Content-Type": "application/json",
+                    },
+                    credentials:"include"
+                });
+                if(tokenRes.status === 200){
+                    const data = await tokenRes.json();
+                    setAccessToken(data.access_token);
+                    await fetchProfilePosts(data.access_token);
                 }
                 else{
-                    throw new Error(res.statusText);
+                    setLogout(true);
                 }
+            }
+            else{
+                console.error(res.statusText);
+            }
 
-            })
-            .catch(err=>console.error(err));
+        }
+        catch(e){
+            console.error(e);
+        }
 
     };
-    const checkFriendRequestInProcess = (profileAccountId)=>{
+    const checkFriendRequestInProcess = async (accessTokenParam)=>{
 
-        fetch(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/checkFriendRequest/"+account?.id+"/"+profileAccountId,{
-            method:"GET",
-            headers:{
-                "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
-            },
-            credentials:"include"
-        })
-            .then(async (res)=>{
-                if(res.status === 200){
-                    const data = await res.json();
+        try{
+            const res = await fetch(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/checkFriendRequest/"+account?.id+"/"+id,{
+                method:"GET",
+                headers:{
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${accessTokenParam||accessToken}`
+                },
+                credentials:"include"
+            });
+            if(res.status === 200){
+                const data = await res.json();
 
-                    setFriendRequestInProcess(data);
+                setFriendRequestInProcess(data);
 
-                }
-                else if(res.status === 401){
-                    fetch(import.meta.env.VITE_REFRESH_TOKEN,{
-                        method:"GET",
-                        headers:{
-                            "Content-Type": "application/json",
-                        },
-                        credentials:"include"
-                    })
-                        .then(async (res)=>{
-                            if(res.status === 200){
-                                const data = await res.json();
-                                setAccessToken(data.access_token);
-                                checkFriendRequestInProcess();
-                            }
-                            else{
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
-                            }
-
-                        })
-                        .catch(err=>console.error(err));
+            }
+            else if(res.status === 401){
+             const tokenRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN,{
+                    method:"GET",
+                    headers:{
+                        "Content-Type": "application/json",
+                    },
+                    credentials:"include"
+                });
+                if(tokenRes.status === 200){
+                    const data = await tokenRes.json();
+                    setAccessToken(data.access_token);
+                    await checkFriendRequestInProcess(data.access_token);
                 }
                 else{
-                    throw new Error(res.statusText);
+                    setLogout(true);
                 }
+            }
+            else{
+                console.error(res.statusText);
+            }
 
-            })
-            .catch(err=>console.error(err));
-
+        }
+        catch (e) {
+            console.error(e);
+        }
     };
 
 
@@ -535,21 +516,15 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
 
 
     useEffect(()=>{
-        fetchAccount(id)
-            .then(res=>{
-               setProfileAccount({
-                   ...res
-               });
-            });
+        ( async ()=>{
+            const profileAccountRes = await fetchAccount(id);
+            setProfileAccount(profileAccountRes);
+            await fetchProfilePosts();
+            await checkFriendRequestInProcess();
+        })();
 
 
     },[]);
-
-    useEffect(()=>{
-        fetchProfilePosts();
-        checkFriendRequestInProcess(id);
-    },[]);
-
 
 
 
@@ -620,7 +595,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                         </div>
                         <div className="flex flex-col gap-1">
                         {
-                            Boolean(account?.followerList.find(follower=>follower.id === profileAccount?.id))?
+                            Boolean(account?.id !== profileAccount?.id) && Boolean(account?.followerList.find(follower=>(follower.id || follower) === profileAccount?.id))?
                                 <>
                                     <div
                                         className="text-gray-900 bg-white border border-gray-300 font-medium rounded-full px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:text-white dark:border-gray-600 flex items-center justify-between gap-1">

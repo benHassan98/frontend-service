@@ -1,7 +1,8 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import {useContext, useEffect, useMemo, useRef, useState} from "react";
 import sanitizeHtml from "sanitize-html"
 import SockJS from "sockjs-client";
 import {Stomp} from "@stomp/stompjs";
+import {Toast} from 'flowbite-react'
 // import qs from 'qs';
 import {useCookies} from "react-cookie";
 import {useNavigate, useParams, useResolvedPath, useSearchParams} from "react-router-dom";
@@ -20,6 +21,8 @@ import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import ContentEditable from "react-contenteditable";
 import axios from "axios";
+import {BlobServiceClient} from "@azure/storage-blob";
+import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 // function Test(){
 //     const testRef = useRef([]);
 //     const testRefFun = ()=>{
@@ -47,7 +50,7 @@ import axios from "axios";
 //     </>
 //     );
 // }
-function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
+function Test({fetchAccount, setNotificationToast}){
     const extensions = [
         StarterKit,
         Image.configure({
@@ -59,8 +62,7 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
 
     ];
 
-    const mRef = useRef();
-    const msgRef = useRef([]);
+
 
 
     const editor = useEditor({
@@ -78,8 +80,9 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
 
     });
 
-    const {type} = useParams();
-    const [params,] = useSearchParams();
+    const [toast, setToast] = useState(false);
+    const {accessToken} = useContext(AccessTokenContext);
+
     const editorContent = '<p>Hello World!</p>'
     const [content, setContent] = useState("");
     const [filesList, setFilesList] = useState([]);
@@ -87,6 +90,7 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
     const testRef = useRef("asdsadasdasdasdasdasdadsad<br>asdasdawdasdashbbawdyawdbawd<br> asdasdasdadawdasdawd");
     const inputRef = useRef();
     const [stompClient, setStompClient] = useState(null);
+    const [stompClient2, setStompClient2] = useState(null);
     const [, setCookie] = useCookies();
     const [searchParams ,] = useSearchParams();
     const navigate = useNavigate();
@@ -94,7 +98,7 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
     const [testState, setTestState] = useState();
     const [showModal, setShowModal] = useState(false);
     const [showPanel, setShowPanel] = useState(false);
-    const [accessToken, setAccessToken] = useState(null);
+
     const handleChange = (e)=>{
         testRef.current = e.target.value;
     };
@@ -219,9 +223,7 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
     //
     // },[]);
 
-    useEffect(()=>{
-        console.log("mRef: ",mRef.current.childNodes[1].classList);
-    },[]);
+
     function useIsInViewport(ref) {
         const [isIntersecting, setIsIntersecting] = useState(false);
 
@@ -332,7 +334,7 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
     console.log("viewPort: ",isInViewPortArr);
     
     
-    console.log("type:  ",type,params.get('token'));
+
     const toBase64 = file => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -403,6 +405,24 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
 
 
 
+    const res = await axios.post(import.meta.env.VITE_API_URL+'/login',{
+        email:"user",
+        password:"password"
+    },{
+        withCredentials:true
+    });
+
+    console.log('accessToken: ', res.data.access_token);
+
+    const gRes = await axios.get('http://localhost:8080/postService/all',{
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${res.data.access_token}`
+        },
+        withCredentials:true
+    });
+
+    console.log(gRes.data);
 
     // console.log(testRef.current);
     // const arr = [];
@@ -494,109 +514,216 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
     //     .catch(err=>console.error(err));
 
 
+    // setToast(prevState => !prevState);
 
 
-    stompClient.send("/addFriend",{},JSON.stringify({
-        addingId:"2",
-        addedId:"1",
-        isRequest:true,
-        isAccepted:false
-    }));
+    // stompClient.send("/addFriend",{},JSON.stringify({
+    //     addingId:"2",
+    //     addedId:"1",
+    //     isRequest:true,
+    //     isAccepted:false
+    // }));
 
+    // const newFile = filesList[0];
+    //
+    //
+    // const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
+    // const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
+    // const blockBlobClient = containerClient.getBlockBlobClient("testImg");
+    // const uploadImageResponse =  await blockBlobClient.upload(newFile,newFile.size);
+    // console.log(uploadImageResponse);
+
+
+
+
+    // stompClient2.send(
+    //     "/chat/test",
+    //     {},
+    //     JSON.stringify({
+    //         idList,
+    //         fileList:[newFile],
+    //         content:"Hello from other socket!!!!"
+    //     })
+    // );
 
 }}>
     test
 </button>
             <button
-            onClick={()=>{
+            onClick={async()=>{
                 const id = 2;
-                let socket = new SockJS(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/notifications/websocket");
-                let stompClient = Stomp.over(socket);
-                stompClient.connect({}, function (frame) {
+                // let socket = new SockJS(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/notifications/websocket");
+                // let stompClient = Stomp.over(socket);
+                // stompClient.connect({}, function (frame) {
+                //
+                //
+                //     console.log('Connected: ' + frame);
+                //
+                //     stompClient.subscribe(`/queue/notifications.${id}`,async (req)=>{
+                //         const reqBody = JSON.parse(req.body);
+                //
+                //         console.log("notifications",reqBody);
+                //
+                //         let notificationId;
+                //         const newNotificationContent = {...reqBody};
+                //
+                //         if(reqBody.type === 'AddFriendNotification'){
+                //             notificationId = reqBody.request?reqBody.addingId:reqBody.addedId;
+                //         }
+                //         else {
+                //             notificationId = reqBody.accountId;
+                //         }
+                //
+                //
+                //
+                //         console.log("notId: ",id);
+                //         console.log("notId: ",notificationId);
+                //
+                //         if(notificationId === id){
+                //             return;
+                //         }
+                //
+                //
+                //
+                //         const notificationAccount =  await fetchAccount(notificationId);
+                //
+                //
+                //         if(reqBody.type === 'AddFriendNotification'){
+                //
+                //             newNotificationContent.url = notificationAccount.picture;
+                //             newNotificationContent.userName = notificationAccount.userName;
+                //             newNotificationContent.text = reqBody.request?"sent you a friend request":"accepted your friend request";
+                //
+                //         }
+                //         else if(reqBody.type === 'NewPostNotification'){
+                //
+                //             newNotificationContent.url = notificationAccount.picture;
+                //             newNotificationContent.userName = notificationAccount.userName;
+                //             newNotificationContent.text = (reqBody.created?"created ":"shared ")+'a new Post';
+                //
+                //
+                //         }
+                //         else if(reqBody.type === 'NewCommentNotification'){
+                //
+                //             newNotificationContent.url = notificationAccount.picture;
+                //             newNotificationContent.userName = notificationAccount.userName;
+                //             newNotificationContent.text = 'commented on your post';
+                //
+                //
+                //         }
+                //         else if(reqBody.type === 'NewLikeNotification'){
+                //
+                //             newNotificationContent.url = notificationAccount.picture;
+                //             newNotificationContent.userName = notificationAccount.userName;
+                //             newNotificationContent.text = 'Liked your post';
+                //
+                //
+                //         }
+                //         else{
+                //
+                //             newNotificationContent.url = notificationAccount.picture;
+                //             newNotificationContent.userName = notificationAccount.userName;
+                //             newNotificationContent.text = 'sent you a message';
+                //         }
+                //
+                //         setNotificationToast(newNotificationContent);
+                //
+                //
+                //     });
+                //
+                //
+                //
+                //
+                // });
 
+
+                // const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
+                // const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
+                // const blobClient = containerClient.getBlobClient("testImg");
+                // const blob = await blobClient.download();
+                // const blobBody = await blob.blobBody;
+                //
+                // const newFileURL = URL.createObjectURL(blobBody);
+                //
+                // editor.chain().focus().setImage({
+                //     src:newFileURL,
+                //     alt:"hbd",
+                // }).run();
+
+
+
+                let socket2 = new SockJS("http://localhost:8080/postService/post/websocket");
+                let stompClient2 = Stomp.over(socket2);
+
+                stompClient2.connect({}, function (frame) {
 
                     console.log('Connected: ' + frame);
 
-                    stompClient.subscribe(`/queue/notifications.${id}`,async (req)=>{
-                        const reqBody = JSON.parse(req.body);
+                    stompClient2.subscribe(`/topic/post.1.add`,
+                        async (req) => {
 
-                        console.log("notifications",reqBody);
+                            const reqBody = JSON.parse(req.body);
 
-                        let notificationId;
-                        const newNotificationContent = {...reqBody};
+                            console.log("NEW");
+                            console.log(reqBody);
 
-                        if(reqBody.type === 'AddFriendNotification'){
-                            notificationId = reqBody.request?reqBody.addingId:reqBody.addedId;
-                        }
-                        else {
-                            notificationId = reqBody.accountId;
-                        }
+                        });
 
 
-
-                        console.log("notId: ",id);
-                        console.log("notId: ",notificationId);
-
-                        if(notificationId === id){
-                            return;
-                        }
-
-
-
-                        const notificationAccount =  await fetchAccount(notificationId);
-
-
-                        if(reqBody.type === 'AddFriendNotification'){
-
-                            newNotificationContent.url = notificationAccount.picture;
-                            newNotificationContent.userName = notificationAccount.userName;
-                            newNotificationContent.text = reqBody.request?"sent you a friend request":"accepted your friend request";
-
-                        }
-                        else if(reqBody.type === 'NewPostNotification'){
-
-                            newNotificationContent.url = notificationAccount.picture;
-                            newNotificationContent.userName = notificationAccount.userName;
-                            newNotificationContent.text = (reqBody.created?"created ":"shared ")+'a new Post';
-
-
-                        }
-                        else if(reqBody.type === 'NewCommentNotification'){
-
-                            newNotificationContent.url = notificationAccount.picture;
-                            newNotificationContent.userName = notificationAccount.userName;
-                            newNotificationContent.text = 'commented on your post';
-
-
-                        }
-                        else if(reqBody.type === 'NewLikeNotification'){
-
-                            newNotificationContent.url = notificationAccount.picture;
-                            newNotificationContent.userName = notificationAccount.userName;
-                            newNotificationContent.text = 'Liked your post';
-
-
-                        }
-                        else{
-
-                            newNotificationContent.url = notificationAccount.picture;
-                            newNotificationContent.userName = notificationAccount.userName;
-                            newNotificationContent.text = 'sent you a message';
-                        }
-
-                        setNotificationToast(newNotificationContent);
-                        setNotificationsArr(prevState => [{
-                            ...reqBody,
-                            account:notificationAccount
-                        }, ...prevState])
-
-                    });
-
-
+                    // stompClient2.subscribe(`/queue/chat.${id}`,async (req)=> {
+                    //         const reqBody = JSON.parse(req.body);
+                    //         const newMessage = {
+                    //             ...reqBody,
+                    //         };
+                    //
+                    //         console.log(`id: ${id}=> `,newMessage);
+                    //
+                    //
+                    //     }
+                    // );
+                    //
+                    // stompClient2.subscribe(`/exchange/availableFriends/${id}`,async (req)=>{
+                    //     const reqBody = JSON.parse(req.body);
+                    //     console.log("available Friends:  "+id+" ",reqBody);
+                    //
+                    // });
+                    //
+                    // stompClient2.subscribe(`/exchange/availableFriends/availableFriend.${id}`,async (req)=>{
+                    //     const reqBody = JSON.parse(req.body);
+                    //     console.log("availableFriend: "+id+" ",reqBody);
+                    //
+                    // });
+                    //
+                    // stompClient2.subscribe(`/exchange/availableFriends/unAvailableFriend.${id}`,async (req)=>{
+                    //     const reqBody = JSON.parse(req.body);
+                    //     console.log("unAvailableFriend: "+id+" ",reqBody);
+                    //
+                    // });
+                    //
+                    // stompClient2.send(
+                    //     "/chat/availableFriend",
+                    //     {},
+                    //     JSON.stringify({
+                    //         accountId:id,
+                    //         friendList:[1]
+                    //     })
+                    // );
+                    //
+                    // stompClient2.send(
+                    //     "/chat/availableFriends",
+                    //     {},
+                    //     JSON.stringify({
+                    //         accountId:id,
+                    //         friendList:[1]
+                    //     }));
+                    //
 
 
                 });
-                setStompClient(stompClient);
+
+                // setStompClient(stompClient);
+
+                setStompClient2(stompClient2);
 
 
                 // console.log(import.meta.env.VITE_ACCOUNT_SERVICE+"/10");
@@ -604,7 +731,7 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
                    //  method:"GET",
                    //  headers:{
                    //      "Content-Type": "application/json",
-                   //      "Authorization": `Bearer  `
+                   //      "Authorization": `Bearer `
                    //  },
                    //  credentials:"include"
                    //
@@ -724,6 +851,10 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
             </div>
             <button onClick={()=>{
 
+
+                setToast(null);
+
+
             }}>Add Image</button>
 
             {/*<div ref={tiptapRef} className="element overflow-y-auto  block  mt-2 max-w-sm h-full  placeholder-gray-400/70 dark:placeholder-gray-500 rounded-lg border border-gray-200 bg-white px-4  py-2.5 text-gray-700 focus:border-blue-400 focus:outline-none focus:ring focus:ring-blue-300 focus:ring-opacity-40 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-blue-300"></div>*/}
@@ -775,281 +906,29 @@ function Test({fetchAccount, setNotificationsArr, setNotificationToast}){
             </div>
 
 
-            <div ref={mRef} className="hs-dropdown inline-flex [--placement:top] [--auto-close:false] fixed left-20 bottom-0">
-                <button id="hs-dropup" type="button"
-                        className="hs-dropdown-toggle py-3 inline-flex justify-center items-center gap-2 rounded-md border font-medium bg-white text-gray-700 shadow-sm align-middle hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-blue-600 transition-all text-sm dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-gray-700 dark:text-gray-400 dark:hover:text-white dark:focus:ring-offset-gray-800 w-48">
-                    Messages
-                    <span className="flex absolute top-0 end-0 -mt-2 -me-2">
-    <span
-        className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 dark:bg-blue-600"></span>
-    <span className="relative inline-flex text-xs bg-blue-500 text-white rounded-full py-0.5 px-1.5">
-      9+
-    </span>
-  </span>
-                    <svg
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fillRule="evenodd"
-                        clipRule="evenodd"
-                        className="h-5 w-5"
-                    >
-                        <path
-                            d="M12 0c-6.627 0-12 4.975-12 11.111 0 3.497 1.745 6.616 4.472 8.652v4.237l4.086-2.242c1.09.301 2.246.464 3.442.464 6.627 0 12-4.974 12-11.111 0-6.136-5.373-11.111-12-11.111zm1.193 14.963l-3.056-3.259-5.963 3.259 6.559-6.963 3.13 3.259 5.889-3.259-6.559 6.963z"/>
-                    </svg>
-                </button>
 
-                <div
-                    className="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden z-10 bg-white rounded-lg dark:bg-gray-800 h-[30rem]"
-                    aria-labelledby="hs-dropup">
-
+            {
+                toast &&
+                <Toast>
                     <div
-                        className="flex flex-col rounded-lg   border-solid border-2 border-slate-500 w-80 h-full overflow-y-auto">
-
-
-
-                        <div className="rounded-t-lg flex items-center justify-center py-2 mt-2">
-
-                            <div className="flex items-center justify-end">
-                                <div className="w-10 h-10 overflow-hidden rounded-full">
-                                    <img
-                                        src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                        className="object-cover w-full h-full" alt="avatar"/>
-                                </div>
-                                <h3 className="font-bold cursor-pointer c truncate w-36 block px-3 py-2 mx-1 mt-2 text-gray-700 transition-colors duration-300 transform rounded-md lg:mt-0 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Khatab
-                                    wedaa</h3>
-
+                        className="fixed bottom-5 right-5 w-[18rem] bg-teal-100 border border-teal-200 text-sm text-teal-800 rounded-lg dark:bg-teal-800/10 dark:border-teal-900 dark:text-teal-500"
+                        role="alert">
+                        <div className="flex p-4">
+                            Hello
+                            <div className="ms-auto">
+                                <Toast.Toggle onDismiss={()=>setToast(false)} />
                             </div>
-
-                            <span
-                                className="inline-flex items-center bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
-                <span className="w-2 h-2 mr-1 bg-green-500 rounded-full"></span>
-                Available
-            </span>
-                            <span
-                                className="inline-flex items-center py-0.5 px-1.5 rounded-full text-xs font-medium bg-blue-500 text-white">5</span>
                         </div>
-
-
-                        {/*<div className="flex-1 flex flex-col-reverse px-2 py-2 bg-gray-800">*/}
-
-                        {/*    <div className="self-end bg-gray-600 rounded-full px-3 py-1">*/}
-                        {/*        <p className="text-xl text-white ">Hi</p>*/}
-                        {/*    </div>*/}
-                        {/*    <div className="self-start bg-slate-900 rounded-full px-3 py-1">*/}
-                        {/*        <p className="text-xl text-white ">Hissss2</p>*/}
-                        {/*    </div>*/}
-                        {/*    <div className="self-end bg-gray-600 rounded-full px-3 py-1">*/}
-                        {/*        <p className="text-xl text-white">How r u?</p>*/}
-                        {/*    </div>*/}
-
-
-                        {/*</div>*/}
-
-
-                        {/*<div>*/}
-
-
-                        {/*    <form>*/}
-                        {/*        <label htmlFor="chat" className="sr-only">Your message</label>*/}
-                        {/*        <div className="flex items-center px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-700">*/}
-
-                        {/*            <textarea id="chat" rows="1"*/}
-                        {/*                      className="block mx-4 p-2.5 w-full text-sm text-gray-900 bg-white rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"*/}
-                        {/*                      placeholder="Your message..." style={{resize:"none"}}></textarea>*/}
-                        {/*            <button type="submit"*/}
-                        {/*                    className="inline-flex justify-center p-2 text-blue-600 rounded-full cursor-pointer hover:bg-blue-100 dark:text-blue-500 dark:hover:bg-gray-600">*/}
-                        {/*                <svg aria-hidden="true" className="w-6 h-6 rotate-90" fill="currentColor"*/}
-                        {/*                     viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">*/}
-                        {/*                    <path*/}
-                        {/*                        d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path>*/}
-                        {/*                </svg>*/}
-                        {/*                <span className="sr-only">Send message</span>*/}
-                        {/*            </button>*/}
-
-                        {/*            <button type="submit"*/}
-                        {/*                    className="inline-flex justify-center p-2 text-blue-600 rounded-full cursor-pointer hover:bg-blue-100 dark:text-blue-500 dark:hover:bg-gray-600">*/}
-                        {/*                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24">*/}
-                        {/*                    <path fill="currentColor"*/}
-                        {/*                          d="M23 4v2h-3v3h-2V6h-3V4h3V1h2v3h3zm-8.5 7a1.5 1.5 0 1 0-.001-3.001A1.5 1.5 0 0 0 14.5 11zm3.5 3.234l-.513-.57a2 2 0 0 0-2.976 0l-.656.731L9 9l-3 3.333V6h7V4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7h-2v3.234z"/>*/}
-                        {/*                </svg>*/}
-                        {/*                <span className="sr-only">Send image</span>*/}
-                        {/*            </button>*/}
-                        {/*        </div>*/}
-                        {/*    </form>*/}
-
-
-                        {/*</div>*/}
-
 
                     </div>
 
 
-                </div>
-            </div>
+                </Toast>
+            }
 
 
 
 
-            <div ref={mRef} className="hs-dropdown inline-flex [--placement:top] [--auto-close:false] fixed right-20 bottom-0">
-                <button id="hs-dropup" type="button"
-                        className="hs-dropdown-toggle py-3 inline-flex justify-center items-center gap-2 rounded-md border font-medium bg-white text-gray-700 shadow-sm align-middle hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-blue-600 transition-all text-sm dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-gray-700 dark:text-gray-400 dark:hover:text-white dark:focus:ring-offset-gray-800 w-48">
-                    Messages
-                    <span className="flex absolute top-0 end-0 -mt-2 -me-2">
-    <span
-        className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 dark:bg-blue-600"></span>
-    <span className="relative inline-flex text-xs bg-blue-500 text-white rounded-full py-0.5 px-1.5">
-      9+
-    </span>
-  </span>
-                    <svg
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fillRule="evenodd"
-                        clipRule="evenodd"
-                        className="h-5 w-5"
-                    >
-                        <path
-                            d="M12 0c-6.627 0-12 4.975-12 11.111 0 3.497 1.745 6.616 4.472 8.652v4.237l4.086-2.242c1.09.301 2.246.464 3.442.464 6.627 0 12-4.974 12-11.111 0-6.136-5.373-11.111-12-11.111zm1.193 14.963l-3.056-3.259-5.963 3.259 6.559-6.963 3.13 3.259 5.889-3.259-6.559 6.963z"/>
-                    </svg>
-                </button>
-
-                <div
-                    className="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden z-10 bg-white rounded-lg dark:bg-gray-800 h-[30rem]"
-                    aria-labelledby="hs-dropup">
-
-                    <div
-                        className="flex flex-col rounded-lg bg-gray-600 border-solid border-2 border-slate-500 w-80 h-full overflow-y-auto">
-
-                        <div className="rounded-t-lg flex items-center justify-center py-2 mt-2">
-
-                            <div className="flex items-center justify-end">
-                                <button className="mx-2 inline-flex justify-center p-2 text-blue-600 rounded-full cursor-pointer hover:bg-blue-100 dark:text-blue-500 dark:hover:bg-gray-800">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" width="12" height="12" viewBox="0 0 12 12">
-                                        <path fill="currentColor" d="M10.5 6a.75.75 0 0 0-.75-.75H3.81l1.97-1.97a.75.75 0 0 0-1.06-1.06L1.47 5.47a.75.75 0 0 0 0 1.06l3.25 3.25a.75.75 0 0 0 1.06-1.06L3.81 6.75h5.94A.75.75 0 0 0 10.5 6Z"/>
-                                    </svg>
-                                </button>
-                                <div className="w-10 h-10 overflow-hidden rounded-full">
-                                    <img
-                                        src="https://images.unsplash.com/photo-1502980426475-b83966705988?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=40&q=80"
-                                        className="object-cover w-full h-full" alt="avatar"/>
-                                </div>
-                                <h3 className="font-bold cursor-pointer c truncate w-36 block px-3 py-2 mx-1 mt-2 text-gray-700 transition-colors duration-300 transform rounded-md lg:mt-0 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Khatab
-                                    wedaa</h3>
-
-                            </div>
-
-                            <span
-                                className="inline-flex items-center bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
-                <span className="w-2 h-2 mr-1 bg-green-500 rounded-full"></span>
-                Available
-            </span>
-                        </div>
-
-
-
-                        <div className="flex-1 flex flex-col px-2 py-2 bg-gray-800">
-
-
-
-                            <div className="self-end bg-gray-600 rounded-full px-3 py-1 flex gap-2">
-                                <p className="text-xl text-white ">Hi</p>
-                            </div>
-                            <div className="self-start bg-slate-900 rounded-full px-3 py-1">
-                                <p className="text-xl text-white ">Hissss2</p>
-                            </div>
-                            <div className="self-end bg-gray-600 rounded-full px-3 py-1">
-                                <p className="text-xl text-white">How r u?</p>
-                            </div>
-                            <Message content={"Test1"}/>
-                            <Message content={"Test2"}/>
-                            <div className="self-end bg-black rounded-full px-3 py-1 mt-2 border-2 border-white">
-                                <p className="text-xl text-white">*Deleted message*</p>
-                            </div>
-                            <div>
-                                <svg className="w-6 h-6 text-gray-800 dark:text-white" viewBox="0 0 24 24"
-                                     fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12 22C10.8954 22 10 21.1046 10 20H14C14 21.1046 13.1046 22 12 22ZM20 19H4V17L6 16V10.5C6 7.038 7.421 4.793 10 4.18V2H13C12.3479 2.86394 11.9967 3.91762 12 5C12 5.25138 12.0187 5.50241 12.056 5.751H12C10.7799 5.67197 9.60301 6.21765 8.875 7.2C8.25255 8.18456 7.94714 9.33638 8 10.5V17H16V10.5C16 10.289 15.993 10.086 15.979 9.9C16.6405 10.0366 17.3226 10.039 17.985 9.907C17.996 10.118 18 10.319 18 10.507V16L20 17V19ZM17 8C16.3958 8.00073 15.8055 7.81839 15.307 7.477C14.1288 6.67158 13.6811 5.14761 14.2365 3.8329C14.7919 2.5182 16.1966 1.77678 17.5954 2.06004C18.9942 2.34329 19.9998 3.5728 20 5C20 6.65685 18.6569 8 17 8Z"
-                                        fill="currentColor"></path>
-                                </svg>
-                            </div>
-
-                        </div>
-
-
-                        <div>
-
-
-                            <form>
-                                <label htmlFor="chat" className="sr-only">Your message</label>
-                                <div className="flex items-center px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-700">
-
-                                    <textarea id="chat" rows="1"
-                                              className="block mx-4 p-2.5 w-full text-sm text-gray-900 bg-white rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                                              placeholder="Your message..." style={{resize:"none"}}></textarea>
-                                    <button type="submit"
-                                            className="inline-flex justify-center p-2 text-blue-600 rounded-full cursor-pointer hover:bg-blue-100 dark:text-blue-500 dark:hover:bg-gray-600">
-                                        <svg aria-hidden="true" className="w-6 h-6 rotate-90" fill="currentColor"
-                                             viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                            <path
-                                                d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path>
-                                        </svg>
-                                        <span className="sr-only">Send message</span>
-                                    </button>
-
-                                    <button type="submit"
-                                            className="inline-flex justify-center p-2 text-blue-600 rounded-full cursor-pointer hover:bg-blue-100 dark:text-blue-500 dark:hover:bg-gray-600">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24">
-                                            <path fill="currentColor"
-                                                  d="M23 4v2h-3v3h-2V6h-3V4h3V1h2v3h3zm-8.5 7a1.5 1.5 0 1 0-.001-3.001A1.5 1.5 0 0 0 14.5 11zm3.5 3.234l-.513-.57a2 2 0 0 0-2.976 0l-.656.731L9 9l-3 3.333V6h7V4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7h-2v3.234z"/>
-                                        </svg>
-                                        <span className="sr-only">Send image</span>
-                                    </button>
-                                </div>
-                            </form>
-
-
-                        </div>
-
-
-                    </div>
-
-
-                </div>
-            </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <button
-                className="hs-dropdown-toggle relative z-10 block p-2 text-gray-700 border border-transparent rounded-md dark:text-white focus:border-blue-500 focus:ring-opacity-40 dark:focus:ring-opacity-40 focus:ring-blue-300 dark:focus:ring-blue-400 focus:ring bg-gray-900 focus:outline-none mr-2">
-
-                                        <span
-                                            className="absolute top-0 end-0 inline-flex items-center w-3.5 h-3.5 rounded-full border-2 border-white text-xs font-medium transform -translate-y-1/2 translate-x-1/2 bg-red-500 text-white dark:border-slate-900">
-
-  </span>
-
-
-                <svg className="flex-shrink-0 w-5 h-5" xmlns="http://www.w3.org/2000/svg"
-                     width="24" height="24" viewBox="0 0 24 24" fill="none"
-                     stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-                     strokeLinejoin="round">
-                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
-                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
-                </svg>
-            </button>
 
         </>
 

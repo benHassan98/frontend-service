@@ -1,6 +1,5 @@
 import {useContext, useRef} from "react";
 import {useLocation, useNavigate} from "react-router-dom";
-import {useCookies} from "react-cookie";
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 
 function NewPasswordForm({setSuccessToast, setDangerToast}){
@@ -9,8 +8,7 @@ function NewPasswordForm({setSuccessToast, setDangerToast}){
     const passwordConfirmRef = useRef();
     const passwordConfirmErrRef = useRef();
     const navigate = useNavigate();
-    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
-    const [, , removeCookie] = useCookies();
+    const {logout} = useContext(AccessTokenContext);
     const location = useLocation();
     const resetPasswordRequest = (e)=>{
         e.preventDefault();
@@ -29,7 +27,6 @@ function NewPasswordForm({setSuccessToast, setDangerToast}){
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
             },
             body:JSON.stringify({
                 email:location.state.accountEmail,
@@ -44,31 +41,12 @@ function NewPasswordForm({setSuccessToast, setDangerToast}){
             .then(res=>{
                 if(res.status === 200){
                     setSuccessToast("Password reset");
-                    navigate("/");
-                }
-                else if(res.status === 401){
-                    fetch(import.meta.env.VITE_REFRESH_TOKEN, {
-                        method: "GET",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        credentials: "include"
-                    })
-                        .then(async (res) => {
-                            if (res.status === 200) {
-                                const data = await res.json();
-                                setAccessToken(data.access_token);
-                                resetPasswordRequest();
-                            } else {
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
-                            }
-
-                        })
-                        .catch(err => console.error(err));
-
+                    if(logout){
+                        navigate("/login");
+                    }
+                    else{
+                        navigate("/");
+                    }
                 }
                 else{
                     setDangerToast("An error has occurred please try again later");

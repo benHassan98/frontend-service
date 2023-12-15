@@ -1,22 +1,14 @@
 import {useContext, useEffect, useState} from 'react';
 import ContentEditable from "react-contenteditable";
-import { EditorContent, useEditor} from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Image from '@tiptap/extension-image'
-import sanitizeHtml from "sanitize-html";
 import parse from "html-react-parser";
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
-import {useCookies} from "react-cookie";
-import {Link, useNavigate} from "react-router-dom";
+import {Link} from "react-router-dom";
 import TimeAgo from "react-timeago";
 function Comment({propComment, fetchAccount, setCommentsArr, containerClient, showDelete}){
 
     const [comment, setComment] = useState({});
 
-    const {accessToken, setAccessToken} = useContext(AccessTokenContext);
-    const [,,removeCookie] = useCookies();
-    const navigate = useNavigate();
-
+    const {accessToken, setAccessToken, setLogout} = useContext(AccessTokenContext);
 
 
     const injectImages = async ()=>{
@@ -60,15 +52,15 @@ function Comment({propComment, fetchAccount, setCommentsArr, containerClient, sh
 
 
     };
-    const deleteCommentRequest = (e)=>{
+    const deleteCommentRequest = (e, accessTokenParam)=>{
 
-        if(e){e.preventDefault();}
+        e.preventDefault();
 
         fetch(import.meta.env.VITE_POST_SERVICE+"/comment/"+comment.id,{
             method:"DELETE",
             headers:{
                 "Content-Type": "application/json",
-                "Authorization": `Bearer  ${accessToken}`
+                "Authorization": `Bearer ${accessTokenParam||accessToken}`
             },
             credentials:"include"
         })
@@ -92,13 +84,10 @@ function Comment({propComment, fetchAccount, setCommentsArr, containerClient, sh
                             if(res.status === 200){
                                 const data = await res.json();
                                 setAccessToken(data.access_token);
-                                deleteCommentRequest();
+                                deleteCommentRequest(e, data.access_token);
                             }
                             else{
-                                removeCookie("refresh_token");
-                                removeCookie("JSESSIONID");
-                                setAccessToken(null);
-                                navigate("/login");
+                                setLogout(true);
                             }
 
                         })
