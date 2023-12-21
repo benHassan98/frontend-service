@@ -790,6 +790,7 @@ function Post({
     }, [accessTokenIsNull]);
 
     useEffect(()=>{
+    console.log("logout Post: "+id,logout);
         if(logout){
             stompClient.disconnect();
         }

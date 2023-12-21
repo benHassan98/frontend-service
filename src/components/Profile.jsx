@@ -382,8 +382,11 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
     };
     const fetchProfilePosts = async (accessTokenParam)=>{
 
+        const isAccountProfile = Number( Number(id) === Number(account?.id) );
+        console.log(isAccountProfile);
+
         try{
-            const res = await fetch(import.meta.env.VITE_POST_SERVICE+"/profile/"+id,{
+            const res = await fetch(import.meta.env.VITE_POST_SERVICE+"/profile/"+id+"/"+isAccountProfile,{
                 method:"GET",
                 headers:{
                     "Content-Type": "application/json",
@@ -516,13 +519,15 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
 
 
     useEffect(()=>{
-        ( async ()=>{
-            const profileAccountRes = await fetchAccount(id);
-            setProfileAccount(profileAccountRes);
-            await fetchProfilePosts();
-            await checkFriendRequestInProcess();
-        })();
-
+    
+        fetchAccount(id)
+        .then((profileAccountRes)=>{
+            setProfileAccount({...profileAccountRes});
+            checkFriendRequestInProcess()
+            .then(()=>{
+                    fetchProfilePosts();
+            });
+        });
 
     },[]);
 
@@ -547,11 +552,11 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                 </div>
 
                 {
-                    Boolean(account?.id !== profileAccount?.id) &&
+                   Boolean(profileAccount) && Boolean(Number(account?.id) !== Number(id)) &&
                     <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-1">
                         {
-                            Boolean(account?.friendList.find(friend=>friend.id === profileAccount?.id))?
+                              Boolean(account?.friendList.find(friend=>friend.id === profileAccount?.id))?
                                 <>
                                 <div
                                     className="text-gray-900 bg-white border border-gray-300 font-medium rounded-full px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:text-white dark:border-gray-600 flex items-center justify-between gap-1">
@@ -595,7 +600,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                         </div>
                         <div className="flex flex-col gap-1">
                         {
-                            Boolean(account?.id !== profileAccount?.id) && Boolean(account?.followerList.find(follower=>(follower.id || follower) === profileAccount?.id))?
+                          Boolean(account?.id !== profileAccount?.id) && Boolean(account?.followerList.find(follower=>(follower.id || follower) === profileAccount?.id))?
                                 <>
                                     <div
                                         className="text-gray-900 bg-white border border-gray-300 font-medium rounded-full px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:text-white dark:border-gray-600 flex items-center justify-between gap-1">

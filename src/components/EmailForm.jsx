@@ -4,7 +4,7 @@ import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 
 function EmailForm({setInfoToast, setDangerToast}){
     const emailRef = useRef();
-    const {logout} = useContext(AccessTokenContext);
+    const {accessTokenIsNull} = useContext(AccessTokenContext);
     const navigate = useNavigate();
     const sendLinkRequest = (e)=>{
         e.preventDefault();
@@ -26,7 +26,7 @@ function EmailForm({setInfoToast, setDangerToast}){
                 if(res.status === 200){
                     setInfoToast("Please check your inbox for confirmation");
 
-                    if(logout){
+                    if(accessTokenIsNull){
                         navigate("/login");
                     }
                     else{

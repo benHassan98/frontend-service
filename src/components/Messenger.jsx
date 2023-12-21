@@ -9,7 +9,7 @@ import {Stomp} from "@stomp/stompjs";
 import parse from "html-react-parser";
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 import {useCookies} from "react-cookie";
-import {useNavigate} from "react-router-dom";
+import {useNavigate, Link} from "react-router-dom";
 import {v4 as uuidv4} from "uuid";
 import Message from "./Message.jsx";
 
@@ -313,7 +313,7 @@ function Messenger({account}){
 
 
     useEffect(()=>{
-        if(account){
+        if(account?.friendList){
             setFriendsArr([...account.friendList]);
             ( async ()=>{
                 setupStomp();
@@ -479,8 +479,8 @@ return(
                                     src={chatFriend.picture}
                                     className="object-cover w-full h-full" alt="avatar"/>
                             </div>
-                            <h3 className="font-bold cursor-pointer c truncate w-36 block px-3 py-2 mx-1 mt-2 text-gray-700 transition-colors duration-300 transform rounded-md lg:mt-0 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                {chatFriend.userName}</h3>
+                            <Link className="font-bold cursor-pointer c truncate w-36 block px-3 py-2 mx-1 mt-2 text-gray-700 transition-colors duration-300 transform rounded-md lg:mt-0 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700" to={"/profile/"+chatFriend.id}>
+                                {chatFriend.userName}</Link>
 
                         </div>
 

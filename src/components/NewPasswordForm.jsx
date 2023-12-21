@@ -8,7 +8,7 @@ function NewPasswordForm({setSuccessToast, setDangerToast}){
     const passwordConfirmRef = useRef();
     const passwordConfirmErrRef = useRef();
     const navigate = useNavigate();
-    const {logout} = useContext(AccessTokenContext);
+    const {accessTokenIsNull} = useContext(AccessTokenContext);
     const location = useLocation();
     const resetPasswordRequest = (e)=>{
         e.preventDefault();
@@ -41,7 +41,7 @@ function NewPasswordForm({setSuccessToast, setDangerToast}){
             .then(res=>{
                 if(res.status === 200){
                     setSuccessToast("Password reset");
-                    if(logout){
+                    if(accessTokenIsNull){
                         navigate("/login");
                     }
                     else{

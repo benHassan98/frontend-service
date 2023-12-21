@@ -4,7 +4,7 @@ import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 
 function Redirect({setDangerToast, setSuccessToast}){
     const navigate = useNavigate();
-    const {logout} = useContext(AccessTokenContext);
+    const {accessTokenIsNull} = useContext(AccessTokenContext);
     const [params,] = useSearchParams();
     const code = params.get("token");
 
@@ -26,7 +26,7 @@ function Redirect({setDangerToast, setSuccessToast}){
                 }
                 else if(res.status === 200){
                     setSuccessToast("Email Verified");
-                    if(logout){
+                    if(accessTokenIsNull){
                         navigate("/login");
                     }
                     else{
@@ -59,7 +59,7 @@ function Redirect({setDangerToast, setSuccessToast}){
                 }
                 else if(res.status === 400){
                     setDangerToast("Token is expired");
-                    if(logout){
+                    if(accessTokenIsNull){
                         navigate("/login");
                     }
                     else{

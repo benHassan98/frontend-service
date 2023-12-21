@@ -351,10 +351,11 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
 
     useEffect(()=>{
 
-        ( async ()=>{
-            await fetchHomePosts();
-            await fetchNewUsers();
-        })();
+    fetchHomePosts()
+        .then(()=>{
+            fetchNewUsers();
+        });
+
 
     },[]);
 

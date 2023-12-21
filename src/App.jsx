@@ -9,6 +9,7 @@ import Messenger from './components/Messenger.jsx';
 import './App.css';
 import 'preline';
 import {useNavigate, Route, Routes} from "react-router-dom";
+import {useCookies} from "react-cookie";
 import NewPasswordForm from "./components/NewPasswordForm.jsx";
 import EmailForm from "./components/EmailForm.jsx";
 import Test from "./components/Test.jsx";
@@ -32,6 +33,7 @@ function App() {
     const [notificationContent, setNotificationContent] = useState({});
     const [notificationFlag, setNotificationFlag] = useState(false);
     const navigate = useNavigate();
+    const [cookies] = useCookies();
 
 
 
@@ -51,8 +53,10 @@ function App() {
                     withCredentials:true
                 });
 
-
-             if(res.status === 401){
+        }
+        catch (e){
+            
+                if(e.response.status === 401){
                 const refRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN,{
                     method:"GET",
                     headers:{
@@ -68,13 +72,11 @@ function App() {
                   console.error(refRes.statusText);
                 }
             }
-            else if(res.status !== 200) {
-                console.error(res.statusText);
+            else{
+                console.error(e.message);
 
             }
-        }
-        catch (e){
-            console.error(e);
+
 
         }
 
@@ -97,7 +99,6 @@ function App() {
                     withCredentials:true
                 });
 
-            if(res.status === 200){
                 const accountRes = res.data.account;
 
                 const blobClient = containerClient.getBlobClient(accountRes.picture);
@@ -123,9 +124,13 @@ function App() {
                 }
 
                 setAccessToken(res.data.access_token);
-                return accountRes;
-            }
-            else if(res.status === 401){
+                return res.data;
+            
+            
+        }
+        catch (e){
+            
+                if(e.response.status === 401){
                 const refRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN,{
                     method:"GET",
                     headers:{
@@ -142,15 +147,11 @@ function App() {
                     setLogout(true);
                 }
 
-
             }
             else {
-                console.error(res.statusText);
-
+                console.error(e.message);
+                throw new Error(e.message);
             }
-        }
-        catch (e){
-            console.error(e);
 
         }
 
@@ -161,8 +162,7 @@ function App() {
         const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
 
 
-        try{
-            const res = await fetch(import.meta.env.VITE_ACCOUNT_SERVICE+'/'+id,{
+        const res = await fetch(import.meta.env.VITE_ACCOUNT_SERVICE+'/'+id,{
                 method:"GET",
                 headers:{
                     "Content-Type": "application/json",
@@ -171,7 +171,7 @@ function App() {
                 credentials:"include"
             });
 
-            if(res.status === 200){
+                if(res.status === 200){
                 const accountRes = await res.json();
                 const blobClient = containerClient.getBlobClient(accountRes.picture);
                 const blob = await blobClient.download();
@@ -196,8 +196,9 @@ function App() {
                 }
 
                 return accountRes;
-            }
-            else if(res.status === 401){
+
+                }
+                 else if(res.status === 401){
                const refRes = await fetch(import.meta.env.VITE_REFRESH_TOKEN,{
                     method:"GET",
                     headers:{
@@ -217,14 +218,9 @@ function App() {
 
             }
             else {
-                console.error(res.statusText);
-
+                console.error(e.message);
             }
-        }
-        catch (e){
-            console.error(e);
-
-        }
+            
 
     };
 
@@ -257,7 +253,7 @@ function App() {
                     }
                     else {currId = data[i].accountId;}
 
-                    const notificationAccount = await fetchAccount(currId);
+                    const notificationAccount = await fetchAccount(currId, accessTokenParam);
                     const newNotification = {
                         ...data[i],
                         account:notificationAccount
@@ -471,18 +467,27 @@ function App() {
 
     useEffect(()=>{
 
-        if(!accessTokenIsNull){
+        console.log("accessToken: ",accessToken);
+        
+        fetchLoggedAccount()
+                            .then(resObj=>{
+                                    const accountRes = resObj.account;
+                                    const accessTokenParam = resObj.access_token;
+                                    setAccount({...accountRes});
+                                    fetchNotifications(accountRes.id, accessTokenParam)
+                                    .then(()=>{
+                                            setupSTOMP(accountRes.id);     
+                                    });
 
-            console.log("accessToken: ",accessToken);
+                            })
+                            .catch(e=>{
+                                        console.error(e.message);
+                                        navigate("/login");
+                            });
+        
+        
 
-            ( async ()=>{
-                const accountRes =  await fetchLoggedAccount();
-                setAccount({...accountRes});
-                await fetchNotifications(accountRes.id);
-                await setupSTOMP(accountRes.id);
-            })();
-
-        }
+        
 
 
     },[accessTokenIsNull]);
@@ -506,15 +511,20 @@ function App() {
 
   return (
       <>
-            <Navbar account={account} setAccount={setAccount} setNotificationsStompClient={setStompClient} fetchAccount={fetchAccount} notificationsArr={notificationsArr} setNotificationsArr={setNotificationsArr} respondToFriendRequest={respondToFriendRequest} />
-            <Messenger account={account} />
+            {
+            Boolean(account) &&
+            <>
+                  <Navbar account={account} setAccount={setAccount} setNotificationsStompClient={setStompClient} fetchAccount={fetchAccount} notificationsArr={notificationsArr} setNotificationsArr={setNotificationsArr} respondToFriendRequest={respondToFriendRequest} />
+                  
+                  <Messenger account={account} />
+            </>
+            }
           <Routes>
               <Route path={"/signup"} element={<SignUp setInfoToast={setInfoToast} />}/>
               <Route path={"/login"} element={<Login setAccount={setAccount} fetchAccount={fetchLoggedAccount} setAccessToken={setAccessToken} setAccessTokenIsNull={setAccessTokenIsNull}/>}/>
               <Route path={"/forgetPassword"} element={<EmailForm setInfoToast={setInfoToast} setDangerToast={setDangerToast}  />}/>
               <Route path={"/redirect/:type"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
               <Route path={"/resetPassword"} element={<NewPasswordForm setSuccessToast={setSuccessToast}/>}/>
-              <Route path={"/test"} element={<Test fetchAccount={fetchAccount} setNotificationToast={setNotificationToast}/>}/>
 
               {
                   Boolean(account) &&
