@@ -3,7 +3,11 @@ import sanitizeHtml from "sanitize-html"
 import SockJS from "sockjs-client";
 import {Stomp} from "@stomp/stompjs";
 import {Toast} from 'flowbite-react'
+import { initializeApp } from "firebase/app";
+import { getStorage, ref, uploadBytes , getBlob, getDownloadURL} from "firebase/storage";
+
 // import qs from 'qs';
+import Buffer from "buffer";
 import {useCookies} from "react-cookie";
 import {useNavigate, useParams, useResolvedPath, useSearchParams} from "react-router-dom";
 import parse from 'html-react-parser';
@@ -21,8 +25,8 @@ import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import ContentEditable from "react-contenteditable";
 import axios from "axios";
-import {BlobServiceClient} from "@azure/storage-blob";
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
+
 // function Test(){
 //     const testRef = useRef([]);
 //     const testRefFun = ()=>{
@@ -62,6 +66,23 @@ function Test({fetchAccount, setNotificationToast}){
 
     ];
 
+    const firebaseConfig = {
+
+        apiKey: "AIzaSyBDiCpDZUFE6uZDKiazLodNqyUdNbIi8bY",
+
+        authDomain: "studied-flow-396202.firebaseapp.com",
+
+        projectId: "studied-flow-396202",
+
+        storageBucket: "studied-flow-396202.appspot.com",
+
+        messagingSenderId: "195097284090",
+
+        appId: "1:195097284090:web:63987a3b7d5ef522dda843",
+
+        measurementId: "G-QW4HHSZVKS"
+
+    };
 
 
 
@@ -333,7 +354,6 @@ function Test({fetchAccount, setNotificationToast}){
     const isInViewPortArr = [];
     console.log("viewPort: ",isInViewPortArr);
     
-    
 
     const toBase64 = file => new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -387,164 +407,25 @@ function Test({fetchAccount, setNotificationToast}){
             </button>
 <button className={"mr-8"} onClick={async ()=>{
 
-   // const res =  parse("<img src='hello' />",{
-   //      replace(domNode){
-   //          if (domNode.name === "img") {
-   //              return <img src={"World"} />;
-   //          }
-   //      }
-   //  });
-   //  console.log(res);
+    const app = initializeApp(firebaseConfig);
 
+    const storage = getStorage(app);
 
-    // new File(filesList[0]., "", undefined);
+    const storageRef = ref(storage, 'default');
 
+    uploadBytes(storageRef, filesList[0]).then((snapshot) => {
 
-    //
-
-
-
-
-    const res = await axios.post(import.meta.env.VITE_API_URL+'/login',{
-        email:"user",
-        password:"password"
-    },{
-        withCredentials:true
+        console.log('Uploaded a blob or file!');
     });
 
-    console.log('accessToken: ', res.data.access_token);
 
-    const gRes = await axios.get('http://localhost:8080/postService/all',{
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${res.data.access_token}`
-        },
-        withCredentials:true
-    });
+    const pathReference = ref(storage, 'test');
+    const res = await getDownloadURL(pathReference);
 
-    console.log(gRes.data);
+    console.log(res);
 
-    // console.log(testRef.current);
-    // const arr = [];
-    // testRef.current.childNodes.forEach(node=>{
-    //     node.lastChild;
-    //     arr.push({
-    //         username:node.lastChild.textContent,
-    //         selected:node.lastChild.classList.contains("selected")
-    //     });
-    // });
-    // console.log(arr);
-    // const res =  await fetch("http://localhost:8888/err",{
-    //     method:"GET"
-    // });
-    // console.log("res: ",res);
+    editor.commands.setContent(`<img class='w-32 h-32' src='${res}'/>`);
 
-
-    // axios.post('http://localhost:8080/perform_login',{
-    //     username:'user',
-    //     password:'password'
-    // })
-    //     .then(res=>{
-    //         console.log(res);
-    //     });
-
-    // await fetch('http://localhost:8888/code',{
-    //     credentials:"same-origin"
-    // });
-    //  const res =  await fetch("http://localhost:8888/logout",{
-    //      method:"POST",
-    //      // body:JSON.stringify({
-    //      //     email:"user",
-    //      //     password:"password"
-    //      // }),
-    //      headers:{
-    //          "Content-Type": "application/json",
-    //      },
-    //      credentials:"include"
-    //  });
-    // console.log("Test:",res);
-    // const json = await res.json();
-    // console.log("Test JSON: ",json);
-
-    // const res = await fetch('http://localhost:8888/code',{
-    //     method:"POST",
-    //     body:JSON.stringify({
-    //         email:"user",
-    //         password:"password"
-    //     }),
-    //     headers:{
-    //         "Content-Type": "application/json",
-    //     },
-    //     credentials:"include"
-    //
-    // });
-
-
-    // navigate('/'+res.url);
-    // const loginResponse = await axios.get('http://localhost:8888/code'
-    //     ,{
-    //     email:'user',
-    //     password:'password'
-    // }
-    // );
-    // console.log(loginResponse.data);
-    // console.log(loginResponse.headers);
-    // await axios.get("http://localhost:8081/oauth2/authorize?client_id=oidc-client&response_type=code&redirect_uri=http://localhost:5173/oauth2/code&scope=openid"
-    //     , {withCredentials:true}
-    // );
-
-
-    // fetch('http://localhost:8080/try',{
-    //     method: "GET",
-    //     credentials:"include",
-    //
-    // })
-    //     .then(res=>console.log(res));
-
-    // axios.post(import.meta.env.VITE_API_URL+"/getUser",{
-    //     access_token:accessToken
-    // },
-    //     {
-    //         withCredentials:true
-    //     })
-    //     .then(res=>{
-    //         console.log(res);
-    //         console.log(res.data);
-    //     })
-    //     .catch(err=>console.error(err));
-
-
-    // setToast(prevState => !prevState);
-
-
-    // stompClient.send("/addFriend",{},JSON.stringify({
-    //     addingId:"2",
-    //     addedId:"1",
-    //     isRequest:true,
-    //     isAccepted:false
-    // }));
-
-    // const newFile = filesList[0];
-    //
-    //
-    // const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
-    // const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
-    // const blockBlobClient = containerClient.getBlockBlobClient("testImg");
-    // const uploadImageResponse =  await blockBlobClient.upload(newFile,newFile.size);
-    // console.log(uploadImageResponse);
-
-
-
-
-    // stompClient2.send(
-    //     "/chat/test",
-    //     {},
-    //     JSON.stringify({
-    //         idList,
-    //         fileList:[newFile],
-    //         content:"Hello from other socket!!!!"
-    //     })
-    // );
 
 }}>
     test

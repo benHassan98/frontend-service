@@ -1,10 +1,9 @@
 import {useContext, useRef, useState, useEffect} from 'react';
 import axios from 'axios';
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
-import {useCookies} from "react-cookie";
 import {useNavigate} from "react-router-dom";
 import {v4 as uuidv4} from 'uuid';
-import {BlobServiceClient} from "@azure/storage-blob";
+import {uploadImage} from './FireBaseConfig.js';
 
 function Settings({account, fetchAccount, setAccount, setSuccessToast,  setInfoToast, setDangerToast}){
 
@@ -13,8 +12,7 @@ function Settings({account, fetchAccount, setAccount, setSuccessToast,  setInfoT
 
     const {accessToken, setAccessToken, setLogout} = useContext(AccessTokenContext);
     const navigate = useNavigate();
-    const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
-    const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
+
 
 
 
@@ -84,9 +82,7 @@ function Settings({account, fetchAccount, setAccount, setSuccessToast,  setInfoT
         });
 
         if(image.id && !accessTokenParam){
-            const blockBlobClient = containerClient.getBlockBlobClient(image.id);
-            await blockBlobClient.upload(image.file,image.file.size);
-
+            await uploadImage(image.file, image.id);
         }
         formData.delete("url");
         formData.delete("image");

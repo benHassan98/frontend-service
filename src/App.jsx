@@ -9,18 +9,20 @@ import Messenger from './components/Messenger.jsx';
 import './App.css';
 import 'preline';
 import {useNavigate, Route, Routes} from "react-router-dom";
-import {useCookies} from "react-cookie";
 import NewPasswordForm from "./components/NewPasswordForm.jsx";
 import EmailForm from "./components/EmailForm.jsx";
 import Test from "./components/Test.jsx";
 import PostPage from "./components/PostPage.jsx";
-import {BlobServiceClient} from "@azure/storage-blob";
 import Profile from "./components/Profile.jsx";
 import SockJS from "sockjs-client";
 import {Stomp} from "@stomp/stompjs";
 import {AccessTokenContext} from "./components/AccessTokenProvider.jsx";
 import axios from "axios";
-import {Toast} from 'flowbite-react'
+import {Toast} from 'flowbite-react';
+import {downloadImage} from "./components/FireBaseConfig.js";
+
+
+
 function App() {
     const [account,setAccount] = useState(null);
     const [notificationsArr, setNotificationsArr] = useState([]);
@@ -33,11 +35,12 @@ function App() {
     const [notificationContent, setNotificationContent] = useState({});
     const [notificationFlag, setNotificationFlag] = useState(false);
     const navigate = useNavigate();
-    const [cookies] = useCookies();
+
 
 
 
     const {accessToken, setAccessToken, accessTokenIsNull, setAccessTokenIsNull, logout, setLogout} = useContext(AccessTokenContext);
+
 
 
     const [stompClient, setStompClient] = useState(null);
@@ -46,7 +49,7 @@ function App() {
     const signoutRequest = async (accessTokenParam)=>{
 
         try{
-            const res = await axios.post(import.meta.env.VITE_API_URL+"/logout",{
+            await axios.post(import.meta.env.VITE_API_URL+"/logout",{
                     access_token:accessTokenParam||accessToken
                 },
                 {
@@ -87,10 +90,7 @@ function App() {
 
     const fetchLoggedAccount = async (accessTokenParam)=>{
 
-        const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
-        const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
-
-
+        
         try{
             const res = await axios.post(import.meta.env.VITE_API_URL+"/getUser",{
                     access_token:accessTokenParam||accessToken
@@ -101,24 +101,17 @@ function App() {
 
                 const accountRes = res.data.account;
 
-                const blobClient = containerClient.getBlobClient(accountRes.picture);
-                const blob = await blobClient.download();
-                const blobBody = await blob.blobBody;
-
                 const accountUrl = accountRes.picture;
-                accountRes.picture = URL.createObjectURL(blobBody);
+                
+                accountRes.picture = await downloadImage(accountRes.picture);
+                
                 accountRes.url = accountUrl;
 
                 for(let i = 0; i< accountRes.friendList.length;i++){
                     const friend = accountRes.friendList[i];
                     const friendUrl = friend.picture;
 
-                    const friendBlobClient = containerClient.getBlobClient(friend.picture);
-                    const friendBlob = await friendBlobClient.download();
-                    const friendBlobBody = await friendBlob.blobBody;
-
-
-                    accountRes.friendList[i].picture = URL.createObjectURL(friendBlobBody);
+                    accountRes.friendList[i].picture = await downloadImage(friend.picture);
                     accountRes.friendList[i].url = friendUrl;
 
                 }
@@ -158,10 +151,7 @@ function App() {
     };
     const fetchAccount = async (id, accessTokenParam)=>{
         if(!id)return;
-        const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
-        const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
-
-
+        
         const res = await fetch(import.meta.env.VITE_ACCOUNT_SERVICE+'/'+id,{
                 method:"GET",
                 headers:{
@@ -172,25 +162,22 @@ function App() {
             });
 
                 if(res.status === 200){
-                const accountRes = await res.json();
-                const blobClient = containerClient.getBlobClient(accountRes.picture);
-                const blob = await blobClient.download();
-                const blobBody = await blob.blobBody;
 
+
+                const accountRes = await res.json();
+        
                 const accountUrl = accountRes.picture;
-                accountRes.picture = URL.createObjectURL(blobBody);
+                
+                accountRes.picture = await downloadImage(accountRes.picture);
+
                 accountRes.url = accountUrl;
 
                 for(let i = 0; i< accountRes.friendList.length;i++){
                     const friend = accountRes.friendList[i];
                     const friendUrl = friend.picture;
 
-                    const friendBlobClient = containerClient.getBlobClient(friend.picture);
-                    const friendBlob = await friendBlobClient.download();
-                    const friendBlobBody = await friendBlob.blobBody;
+                    accountRes.friendList[i].picture = await downloadImage(friend.picture);
 
-
-                    accountRes.friendList[i].picture = URL.createObjectURL(friendBlobBody);
                     accountRes.friendList[i].url = friendUrl;
 
                 }
@@ -218,7 +205,7 @@ function App() {
 
             }
             else {
-                console.error(e.message);
+                console.error(res.statusText);
             }
             
 
@@ -417,7 +404,7 @@ function App() {
             setAccount({
                 ...account,
                 friendList:newFriendArr,
-                followerList:newFollowerList
+                followerList:newFollowerArr
             });
         }
 

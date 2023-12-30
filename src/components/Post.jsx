@@ -1,6 +1,5 @@
 import {useState, useEffect, useContext, useRef} from "react";
 import {useNavigate, Link} from "react-router-dom";
-import {BlobServiceClient} from "@azure/storage-blob";
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 import {useCookies} from "react-cookie";
 import TimeAgo from 'react-timeago';
@@ -16,6 +15,7 @@ import Comment from "./Comment.jsx";
 import axios from "axios";
 import {v4 as uuidv4} from 'uuid';
 import {Modal, Tooltip} from 'flowbite-react';
+import {uploadImage, downloadImage} from './FireBaseConfig.js';
 
 
 function Post({
@@ -69,11 +69,11 @@ function Post({
     const {accessToken, setAccessToken, accessTokenIsNull, setAccessTokenIsNull, logout, setLogout} = useContext(AccessTokenContext);
     const navigate = useNavigate();
 
+
     const [stompClient, setStompClient] = useState(null);
 
 
-    const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
-    const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
+
     const defaultSanitizeOptions = {
         allowedTags: ['img', 'div', 'p'],
         allowedAttributes: {
@@ -146,8 +146,8 @@ function Post({
             const image = imageList[i].file;
             const imageId = imageList[i].id;
 
-            const blockBlobClient = containerClient.getBlockBlobClient(imageId);
-            await blockBlobClient.upload(image,image.size);
+            await uploadImage(image, imageId);
+
         }
 
     };
@@ -563,13 +563,13 @@ function Post({
             const isDeleted = Boolean(currPost.deleted);
             const postAccount = await fetchAccount(currPost.accountId);
 
-            const imagesNameArr = [];
+            const imagesIdArr = [];
             const urlToSrc = {};
             console.log("currPost.content: ",currPost.content);
             parse(currPost.content, {
                 replace(domNode) {
                     if (domNode.name === "img") {
-                        imagesNameArr.push(domNode.attribs.src);
+                        imagesIdArr.push(domNode.attribs.src);
                         return domNode;
                     }
                 }
@@ -577,16 +577,13 @@ function Post({
 
             let newContent = currPost.content;
 
-            for (let elem of imagesNameArr) {
+            for (let elemId of imagesIdArr) {
 
-                const elemBlobClient = containerClient.getBlobClient(elem);
-                const elemBlob = await elemBlobClient.download();
-                const elemBlobBody = await elemBlob.blobBody;
-                const elemURL = URL.createObjectURL(elemBlobBody);
+                const elemURL = await downloadImage(elemId);
 
-                urlToSrc[elemURL] = elem;
+                urlToSrc[elemURL] = elemId;
 
-                newContent = newContent.replace(elem, elemURL);
+                newContent = newContent.replace(elemId, elemURL);
             }
 
             if (!postContentArr.length) {
@@ -746,10 +743,10 @@ function Post({
                         console.log("Like");
 
                     } else if (account?.id !== reqBody.accountId) {
-                        const newContent = await commentContentToHtml(reqBody.content);
+                        // const newContent = await commentContentToHtml(reqBody.content);
                         setCommentsArr(prevState => [...prevState, {
                             ...reqBody,
-                            content: newContent
+                            // content: newContent
                         }]);
                         console.log("Comment");
                     }

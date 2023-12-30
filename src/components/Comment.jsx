@@ -4,7 +4,10 @@ import parse from "html-react-parser";
 import {AccessTokenContext} from "./AccessTokenProvider.jsx";
 import {Link} from "react-router-dom";
 import TimeAgo from "react-timeago";
-function Comment({propComment, fetchAccount, setCommentsArr, containerClient, showDelete}){
+import {downloadImage} from "./FireBaseConfig.js";
+
+
+function Comment({propComment, fetchAccount, setCommentsArr, showDelete}){
 
     const [comment, setComment] = useState({});
 
@@ -15,7 +18,7 @@ function Comment({propComment, fetchAccount, setCommentsArr, containerClient, sh
 
         const account = await fetchAccount(propComment.accountId);
 
-        const imagesNameArr = [];
+        const imagesIdArr = [];
         const urlToSrc = {};
 
 
@@ -23,7 +26,7 @@ function Comment({propComment, fetchAccount, setCommentsArr, containerClient, sh
         parse(propComment.content,{
             replace(domNode){
                 if (domNode.name === "img") {
-                    imagesNameArr.push(domNode.attribs.src);
+                    imagesIdArr.push(domNode.attribs.src);
                     return domNode;
                 }
             }
@@ -31,16 +34,14 @@ function Comment({propComment, fetchAccount, setCommentsArr, containerClient, sh
 
         let newContent = propComment.content;
 
-        for(let elem of imagesNameArr){
+        for(let elemId of imagesIdArr){
 
-            const elemBlobClient = containerClient.getBlobClient(elem);
-            const elemBlob = await elemBlobClient.download();
-            const elemBlobBody = await elemBlob.blobBody;
-            const elemURL = URL.createObjectURL(elemBlobBody);
+            const elemURL = await downloadImage(elemId);
 
-            urlToSrc[elemURL] = elem;
+            urlToSrc[elemURL] = elemId;
 
-            newContent = newContent.replace(elem, elemURL);
+            newContent = newContent.replace(elemId, elemURL);
+
         }
 
         setComment({

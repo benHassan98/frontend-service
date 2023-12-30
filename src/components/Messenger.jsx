@@ -1,7 +1,6 @@
 import {useContext, useEffect, useState} from 'react';
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
-import {BlobServiceClient} from "@azure/storage-blob";
 import {EditorContent, useEditor} from "@tiptap/react";
 import sanitizeHtml from "sanitize-html";
 import SockJS from "sockjs-client";
@@ -12,7 +11,7 @@ import {useCookies} from "react-cookie";
 import {useNavigate, Link} from "react-router-dom";
 import {v4 as uuidv4} from "uuid";
 import Message from "./Message.jsx";
-
+import {uploadImage} from './FireBaseConfig.js';
 
 function Messenger({account}){
 
@@ -33,6 +32,7 @@ function Messenger({account}){
     const {accessToken, setAccessToken, setAccessTokenIsNull, logout, setLogout} = useContext(AccessTokenContext);
     const navigate = useNavigate();
 
+
     const extensions = [
         StarterKit,
         Image.configure({
@@ -44,8 +44,7 @@ function Messenger({account}){
         }),
 
     ];
-    const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
-    const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
+    
     const defaultSanitizeOptions = {
         allowedTags: ['img', 'div', 'p'],
         allowedAttributes: {
@@ -193,9 +192,7 @@ function Messenger({account}){
             const newImageId = idList[i];
             const newImage = fileList[i];
 
-
-            const blockBlobClient = containerClient.getBlockBlobClient(newImageId);
-            await blockBlobClient.upload(newImage,newImage.size);
+            await uploadImage(newImage, newImageId);
 
         }
 

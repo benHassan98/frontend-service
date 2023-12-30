@@ -1,7 +1,8 @@
-import {useContext, useEffect, useMemo, useRef, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {Tooltip} from "flowbite-react";
 import ContentEditable from "react-contenteditable";
 import parse from "html-react-parser";
+import {downloadImage} from "./FireBaseConfig.js";
 
 
 function useIsInViewport(ref) {
@@ -26,7 +27,7 @@ function useIsInViewport(ref) {
     return isIntersecting;
 }
 
-function Message({accountId, setUnReadMessages, setMessagesArr, messageProp, stompClient, containerClient}){
+function Message({accountId, setUnReadMessages, setMessagesArr, messageProp, stompClient}){
     const [message, setMessage] = useState(messageProp);
     const messageRef = useRef(null);
     const isInViewPort = useIsInViewport(messageRef);
@@ -49,17 +50,12 @@ function Message({accountId, setUnReadMessages, setMessagesArr, messageProp, sto
     };
     const injectImages = async ()=>{
 
-
-
-        const imagesNameArr = [];
-
-
-
+        const imagesIdArr = [];
 
         parse(messageProp.content,{
             replace(domNode){
                 if (domNode.name === "img") {
-                    imagesNameArr.push(domNode.attribs.src);
+                    imagesIdArr.push(domNode.attribs.src);
                     return domNode;
                 }
             }
@@ -67,14 +63,11 @@ function Message({accountId, setUnReadMessages, setMessagesArr, messageProp, sto
 
         let newContent = messageProp.content;
 
-        for(let elem of imagesNameArr){
+        for(let elemId of imagesIdArr){
 
-            const elemBlobClient = containerClient.getBlobClient(elem);
-            const elemBlob = await elemBlobClient.download();
-            const elemBlobBody = await elemBlob.blobBody;
-            const elemURL = URL.createObjectURL(elemBlobBody);
+            const elemURL = await downloadImage(elemId);
 
-            newContent = newContent.replace(elem, elemURL);
+            newContent = newContent.replace(elemId, elemURL);
         }
 
         setMessage({

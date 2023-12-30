@@ -11,9 +11,11 @@ import axios from "axios";
 import {Modal, Tooltip} from "flowbite-react";
 import Post from "./Post.jsx";
 import {v4 as uuidv4} from 'uuid';
-import {BlobServiceClient} from "@azure/storage-blob";
+import {uploadImage} from "./FireBaseConfig.js";
 
-function Home({account, fetchAccount, notificationStompClient, setSuccessToast, setDangerToast}){
+
+
+function Home({account, fetchAccount, setSuccessToast, setDangerToast}){
 
     const [newUsersArr, setNewUsersArr] = useState([]);
     const [postsArr, setPostsArr] = useState([]);
@@ -44,8 +46,7 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
 
     const [newPostModal, setNewPostModal] = useState(false);
 
-    const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
-    const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
+    
     const defaultSanitizeOptions = {
         allowedTags: [ 'img', 'div', 'p' ],
         allowedAttributes: {
@@ -113,12 +114,6 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
 
         const imageList = newPostImageList.filter(image=>isImageExists(image.url,content));
 
-        imageList.forEach(image=>{
-            content = content.replace(image.url, image.id);
-            URL.revokeObjectURL(image.url);
-        });
-
-
         if(!accessTokenParam){
 
             for(let i = 0;i<imageList.length;i++){
@@ -126,11 +121,17 @@ function Home({account, fetchAccount, notificationStompClient, setSuccessToast, 
                 const image = imageList[i].file;
                 const imageId = imageList[i].id;
 
-                const blockBlobClient = containerClient.getBlockBlobClient(imageId);
-                await blockBlobClient.upload(image,image.size);
+                await uploadImage(image, imageId);
+
+            
             }
 
         }
+
+        imageList.forEach(image=>{
+            content = content.replace(image.url, image.id);
+            URL.revokeObjectURL(image.url);
+        });
 
 
         const formData = new FormData();

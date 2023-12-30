@@ -11,7 +11,8 @@ import Post from "./Post.jsx";
 import axios from "axios";
 import parse from "html-react-parser";
 import {Modal, Tooltip} from "flowbite-react";
-import {BlobServiceClient} from "@azure/storage-blob";
+import {uploadImage} from './FireBaseConfig.js';
+
 
 function Profile({account, setAccount,  fetchAccount, notificationStompClient, setSuccessToast, setDangerToast}){
 
@@ -40,12 +41,12 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
     const {accessToken, setAccessToken, setLogout} = useContext(AccessTokenContext);
 
 
+
     const friendsRef = useRef();
 
     const [postModal, setPostModal] = useState(false);
 
-    const blobServiceClient = new BlobServiceClient(import.meta.env.VITE_BLOB_SAS);
-    const containerClient = blobServiceClient.getContainerClient(import.meta.env.VITE_CONTAINER_NAME);
+
     const defaultSanitizeOptions = {
         allowedTags: [ 'img', 'div', 'p' ],
         allowedAttributes: {
@@ -126,8 +127,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
                 const image = imageList[i].file;
                 const imageId = imageList[i].id;
 
-                const blockBlobClient = containerClient.getBlockBlobClient(imageId);
-                await blockBlobClient.upload(image,image.size);
+                await uploadImage(image, imageId);
             }
 
         }
