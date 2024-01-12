@@ -212,7 +212,7 @@ function Profile({account, setAccount,  fetchAccount, notificationStompClient, s
 
 
         notificationStompClient.send(
-            "/addFriend",
+            "/app/addFriend",
             {},
             JSON.stringify({
                 addingId:account?.id,

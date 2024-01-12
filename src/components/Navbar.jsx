@@ -18,7 +18,7 @@ function Navbar({account, fetchAccount, notificationsArr, setNotificationsArr, r
 
     const setupStomp = ()=>{
 
-        let socket = new SockJS(import.meta.env.VITE_ACCOUNT_SERVICE+"/account/websocket");
+        let socket = new SockJS(import.meta.env.VITE_ACCOUNT_SERVICE+"/websocket");
         let stompClient = Stomp.over(socket);
         stompClient.connect({}, function (frame) {
 
@@ -48,7 +48,7 @@ function Navbar({account, fetchAccount, notificationsArr, setNotificationsArr, r
     };
     const searchRequest = (searchContent)=>{
         stompClient.send(
-            "/accountSearch/"+account?.id,
+            "/app/accountSearch/"+account?.id,
             {},
             JSON.stringify({
                 searchText:searchContent

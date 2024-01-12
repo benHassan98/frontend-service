@@ -71,7 +71,7 @@ function Messenger({account}){
 
     const setupStomp = ()=>{
         console.log("account?   ",account);
-        let socket = new SockJS(import.meta.env.VITE_CHAT_SERVICE+"/chat/websocket");
+        let socket = new SockJS(import.meta.env.VITE_CHAT_SERVICE+"/websocket");
         let stompClient = Stomp.over(socket);
 
         stompClient.connect({},function (frame) {
@@ -120,7 +120,7 @@ function Messenger({account}){
 
             setTimeout(()=>{
                 stompClient.send(
-                    "/chat/availableFriends",
+                    "/app/chat/availableFriends",
                     {},
                     JSON.stringify({
                         accountId:account?.id,
@@ -129,7 +129,7 @@ function Messenger({account}){
                 );
 
                 stompClient.send(
-                    "/chat/availableFriend",
+                    "/app/chat/availableFriend",
                     {},
                     JSON.stringify({
                         accountId:account?.id,
@@ -175,7 +175,8 @@ function Messenger({account}){
         const newMessage = {
             senderId:account?.id,
             receiverId:chatFriend?.id,
-            content
+            content,
+            
         };
 
 
@@ -201,7 +202,7 @@ function Messenger({account}){
 
 
         stompClient.send(
-            "/chat/send",
+            "/app/chat/send",
             {},
             JSON.stringify({
                 ...newMessage,
@@ -325,7 +326,7 @@ function Messenger({account}){
         if(logout){
 
             stompClient.send(
-                "/chat/unAvailableFriend",
+                "/app/chat/unAvailableFriend",
                 {},
                 JSON.stringify({
                     accountId:account?.id,
@@ -496,7 +497,7 @@ return(
                 {
                     messagesArr.map(message=>{
                         return (
-                            <Message key={`message-${message.id}`} messageProp={message} setUnReadMessages={setUnReadMessages} setMessagesArr={setMessagesArr} accountId={account?.id} stompClient={stompClient} containerClient={containerClient}/>
+                            <Message key={`message-${message.id}`} messageProp={message} setUnReadMessages={setUnReadMessages} setMessagesArr={setMessagesArr} accountId={account?.id} stompClient={stompClient}/>
                         );
                     })
                 }

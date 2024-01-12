@@ -543,7 +543,7 @@ function Post({
     const likeRequest = () => {
 
 
-        stompClient.send("/like", {},
+        stompClient.send("/app/like", {},
             JSON.stringify({
                 accountId: account?.id,
                 postId: post.id,
@@ -723,7 +723,7 @@ function Post({
     useEffect(() => {
         console.log("setStomp Account: ", account);
 
-        let socket = new SockJS(import.meta.env.VITE_POST_SERVICE + "/post/websocket");
+        let socket = new SockJS(import.meta.env.VITE_POST_SERVICE + "/websocket");
         let stompClient = Stomp.over(socket);
         stompClient.connect({}, function (frame) {
 

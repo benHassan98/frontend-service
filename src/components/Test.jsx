@@ -407,31 +407,38 @@ function Test({fetchAccount, setNotificationToast}){
             </button>
 <button className={"mr-8"} onClick={async ()=>{
 
-    const app = initializeApp(firebaseConfig);
+    let socket2 = new SockJS("http://localhost:8086/notification-service/websocket");
+    let stompClient2 = Stomp.over(socket2);
 
-    const storage = getStorage(app);
+    stompClient2.connect({}, function (frame) {
 
-    const storageRef = ref(storage, 'default');
+        console.log('Connected: ' + frame);
 
-    uploadBytes(storageRef, filesList[0]).then((snapshot) => {
+        stompClient2.subscribe(`/queue/chat.1`,
+             (req) => {
 
-        console.log('Uploaded a blob or file!');
+                const reqBody = JSON.parse(req.body);
+
+                console.log("NEW");
+                console.log(reqBody);
+
+            });
+
+
+
     });
-
-
-    const pathReference = ref(storage, 'test');
-    const res = await getDownloadURL(pathReference);
-
-    console.log(res);
-
-    editor.commands.setContent(`<img class='w-32 h-32' src='${res}'/>`);
-
+setStompClient2(stompClient2);
 
 }}>
     test
 </button>
             <button
             onClick={async()=>{
+                stompClient2.send(
+                    "/app/accountSearch/1",
+                    {},
+                    JSON.stringify({searchText:"HellWorld"})
+                );
                 const id = 2;
                 // let socket = new SockJS(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/notifications/websocket");
                 // let stompClient = Stomp.over(socket);
@@ -533,78 +540,78 @@ function Test({fetchAccount, setNotificationToast}){
 
 
 
-                let socket2 = new SockJS("http://localhost:8080/postService/post/websocket");
-                let stompClient2 = Stomp.over(socket2);
-
-                stompClient2.connect({}, function (frame) {
-
-                    console.log('Connected: ' + frame);
-
-                    stompClient2.subscribe(`/topic/post.1.add`,
-                        async (req) => {
-
-                            const reqBody = JSON.parse(req.body);
-
-                            console.log("NEW");
-                            console.log(reqBody);
-
-                        });
-
-
-                    // stompClient2.subscribe(`/queue/chat.${id}`,async (req)=> {
-                    //         const reqBody = JSON.parse(req.body);
-                    //         const newMessage = {
-                    //             ...reqBody,
-                    //         };
-                    //
-                    //         console.log(`id: ${id}=> `,newMessage);
-                    //
-                    //
-                    //     }
-                    // );
-                    //
-                    // stompClient2.subscribe(`/exchange/availableFriends/${id}`,async (req)=>{
-                    //     const reqBody = JSON.parse(req.body);
-                    //     console.log("available Friends:  "+id+" ",reqBody);
-                    //
-                    // });
-                    //
-                    // stompClient2.subscribe(`/exchange/availableFriends/availableFriend.${id}`,async (req)=>{
-                    //     const reqBody = JSON.parse(req.body);
-                    //     console.log("availableFriend: "+id+" ",reqBody);
-                    //
-                    // });
-                    //
-                    // stompClient2.subscribe(`/exchange/availableFriends/unAvailableFriend.${id}`,async (req)=>{
-                    //     const reqBody = JSON.parse(req.body);
-                    //     console.log("unAvailableFriend: "+id+" ",reqBody);
-                    //
-                    // });
-                    //
-                    // stompClient2.send(
-                    //     "/chat/availableFriend",
-                    //     {},
-                    //     JSON.stringify({
-                    //         accountId:id,
-                    //         friendList:[1]
-                    //     })
-                    // );
-                    //
-                    // stompClient2.send(
-                    //     "/chat/availableFriends",
-                    //     {},
-                    //     JSON.stringify({
-                    //         accountId:id,
-                    //         friendList:[1]
-                    //     }));
-                    //
-
-
-                });
-
-                // setStompClient(stompClient);
-
-                setStompClient2(stompClient2);
+                // let socket2 = new SockJS("http://localhost:8080/postService/post/websocket");
+                // let stompClient2 = Stomp.over(socket2);
+                //
+                // stompClient2.connect({}, function (frame) {
+                //
+                //     console.log('Connected: ' + frame);
+                //
+                //     stompClient2.subscribe(`/topic/post.1.add`,
+                //         async (req) => {
+                //
+                //             const reqBody = JSON.parse(req.body);
+                //
+                //             console.log("NEW");
+                //             console.log(reqBody);
+                //
+                //         });
+                //
+                //
+                //     stompClient2.subscribe(`/queue/chat.${id}`,async (req)=> {
+                //             const reqBody = JSON.parse(req.body);
+                //             const newMessage = {
+                //                 ...reqBody,
+                //             };
+                //
+                //             console.log(`id: ${id}=> `,newMessage);
+                //
+                //
+                //         }
+                //     );
+                //
+                //     stompClient2.subscribe(`/exchange/availableFriends/${id}`,async (req)=>{
+                //         const reqBody = JSON.parse(req.body);
+                //         console.log("available Friends:  "+id+" ",reqBody);
+                //
+                //     });
+                //
+                //     stompClient2.subscribe(`/exchange/availableFriends/availableFriend.${id}`,async (req)=>{
+                //         const reqBody = JSON.parse(req.body);
+                //         console.log("availableFriend: "+id+" ",reqBody);
+                //
+                //     });
+                //
+                //     stompClient2.subscribe(`/exchange/availableFriends/unAvailableFriend.${id}`,async (req)=>{
+                //         const reqBody = JSON.parse(req.body);
+                //         console.log("unAvailableFriend: "+id+" ",reqBody);
+                //
+                //     });
+                //
+                //     stompClient2.send(
+                //         "/chat/availableFriend",
+                //         {},
+                //         JSON.stringify({
+                //             accountId:id,
+                //             friendList:[1]
+                //         })
+                //     );
+                //
+                //     stompClient2.send(
+                //         "/chat/availableFriends",
+                //         {},
+                //         JSON.stringify({
+                //             accountId:id,
+                //             friendList:[1]
+                //         }));
+                //
+                //
+                //
+                // });
+                //
+                // // setStompClient(stompClient);
+                //
+                // setStompClient2(stompClient2);
 
 
                 // console.log(import.meta.env.VITE_ACCOUNT_SERVICE+"/10");

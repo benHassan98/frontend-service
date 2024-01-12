@@ -290,7 +290,7 @@ function App() {
     };
     const setupSTOMP = (id)=>{
 
-        let socket = new SockJS(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/notifications/websocket");
+        let socket = new SockJS(import.meta.env.VITE_NOTIFICATIONS_SERVICE+"/websocket");
         let stompClient = Stomp.over(socket);
         stompClient.connect({}, function (frame) {
 
@@ -383,7 +383,7 @@ function App() {
 
     const respondToFriendRequest = async (addingId, isAccepted)=>{
         stompClient.send(
-            "/addFriend",
+            "/app/addFriend",
             {},
             JSON.stringify({
                 addingId,
@@ -484,12 +484,8 @@ function App() {
             ( async ()=>{
 
                 await signoutRequest();
-                stompClient?.disconnect();
-                setAccount(null);
-                setAccessToken(null);
-                setAccessTokenIsNull(true);
-                navigate("/login");
-                setLogout(false);
+                window.location.reload();
+                
             })();
         }
     },[logout]);
@@ -512,7 +508,7 @@ function App() {
               <Route path={"/forgetPassword"} element={<EmailForm setInfoToast={setInfoToast} setDangerToast={setDangerToast}  />}/>
               <Route path={"/redirect/:type"} element={<Redirect setDangerToast={setDangerToast} setSuccessToast={setSuccessToast}  />    }/>
               <Route path={"/resetPassword"} element={<NewPasswordForm setSuccessToast={setSuccessToast}/>}/>
-
+              <Route path={"/test"} element={<Test/>}/>
               {
                   Boolean(account) &&
                   <>

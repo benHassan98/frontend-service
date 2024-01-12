@@ -33,7 +33,7 @@ function Message({accountId, setUnReadMessages, setMessagesArr, messageProp, sto
     const isInViewPort = useIsInViewport(messageRef);
 
     const deleteMessage = ()=>{
-        stompClient?.send("/chat/delete",
+        stompClient?.send("/app/chat/delete",
             {},
             JSON.stringify({...message})
         );
@@ -83,12 +83,12 @@ function Message({accountId, setUnReadMessages, setMessagesArr, messageProp, sto
     },[]);
 
     useEffect(()=>{
-        if(isInViewPort && !message.viewed && message.id){
+        if(isInViewPort && !message.viewed && message.id && message.senderId !== accountId){
             setMessage({
                 ...message,
                 viewed:true
             });
-            stompClient?.send('/chat/view/'+message.id);
+            stompClient?.send('/app/chat/view/'+message.id);
             setUnReadMessages(prevState=>[...prevState.filter(msg=>msg.id !== message.id)]);
         }
     },[isInViewPort]);
