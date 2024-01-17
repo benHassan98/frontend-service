@@ -465,7 +465,7 @@ function App() {
                             })
                             .catch(e=>{
                                         console.error(e.message);
-                                       // navigate("/login");
+                                        navigate("/login");
                             });
         
         
