@@ -419,7 +419,7 @@ function Test({fetchAccount, setNotificationToast}){
 </button>
 <button className={"mr-8"} onClick={async ()=>{
 
-    fetch('http://localhost:8080/health',{
+    fetch('http://localhost:8080/actuator/health',{
     method:"GET",
     credentials:"include"
 
@@ -431,7 +431,7 @@ function Test({fetchAccount, setNotificationToast}){
 </button>
 <button className={"mr-8"} onClick={async ()=>{
 
-    fetch('http://localhost:8080/account-service/health',{
+    fetch('http://localhost:8080/account-service/actuator/health',{
     method:"GET",
     credentials:"include"
 
@@ -443,7 +443,7 @@ function Test({fetchAccount, setNotificationToast}){
 </button>
 <button className={"mr-8"} onClick={async ()=>{
 
-    fetch('http://localhost:8080/post-service/health',{
+    fetch('http://localhost:8080/post-service/actuator/health',{
     method:"GET",
     credentials:"include"
 
@@ -455,7 +455,7 @@ function Test({fetchAccount, setNotificationToast}){
 </button>
 <button className={"mr-8"} onClick={async ()=>{
 
-    fetch('http://localhost:8080/chat-service/health',{
+    fetch('http://localhost:8080/chat-service/actuator/health',{
     method:"GET",
     credentials:"include"
 
@@ -467,7 +467,7 @@ function Test({fetchAccount, setNotificationToast}){
 </button>
 <button className={"mr-8"} onClick={async ()=>{
 
-    fetch('http://localhost:8080/notification-service/health',{
+    fetch('http://localhost:8080/notification-service/actuator/health',{
     method:"GET",
     credentials:"include"
 
