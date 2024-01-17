@@ -369,11 +369,7 @@ function App() {
                     account:notificationAccount
                 }, ...prevState])
 
-            },
-                {
-                    'auto-delete':true,
-                    'durable':true
-                });
+            });
 
 
         });
@@ -469,7 +465,7 @@ function App() {
                             })
                             .catch(e=>{
                                         console.error(e.message);
-                                        navigate("/login");
+                                       // navigate("/login");
                             });
         
         
