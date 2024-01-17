@@ -407,31 +407,78 @@ function Test({fetchAccount, setNotificationToast}){
             </button>
 <button className={"mr-8"} onClick={async ()=>{
 
-    let socket2 = new SockJS("http://localhost:8086/notification-service/websocket");
-    let stompClient2 = Stomp.over(socket2);
+    fetch('http://localhost:8081/health',{
+    method:"GET",
+    credentials:"include"
 
-    stompClient2.connect({}, function (frame) {
-
-        console.log('Connected: ' + frame);
-
-        stompClient2.subscribe(`/queue/chat.1`,
-             (req) => {
-
-                const reqBody = JSON.parse(req.body);
-
-                console.log("NEW");
-                console.log(reqBody);
-
-            });
-
-
-
-    });
-setStompClient2(stompClient2);
-
+    })
+    .then(res=>res.json())
+    .then(res=>console.log(res));
 }}>
-    test
+    bff
 </button>
+<button className={"mr-8"} onClick={async ()=>{
+
+    fetch('http://localhost:8080/health',{
+    method:"GET",
+    credentials:"include"
+
+    })
+    .then(res=>res.json())
+    .then(res=>console.log(res));
+}}>
+    gateway
+</button>
+<button className={"mr-8"} onClick={async ()=>{
+
+    fetch('http://localhost:8080/account-service/health',{
+    method:"GET",
+    credentials:"include"
+
+    })
+    .then(res=>res.json())
+    .then(res=>console.log(res));
+}}>
+    account
+</button>
+<button className={"mr-8"} onClick={async ()=>{
+
+    fetch('http://localhost:8080/post-service/health',{
+    method:"GET",
+    credentials:"include"
+
+    })
+    .then(res=>res.json())
+    .then(res=>console.log(res));
+}}>
+    post
+</button>
+<button className={"mr-8"} onClick={async ()=>{
+
+    fetch('http://localhost:8080/chat-service/health',{
+    method:"GET",
+    credentials:"include"
+
+    })
+    .then(res=>res.json())
+    .then(res=>console.log(res));
+}}>
+    chat
+</button>
+<button className={"mr-8"} onClick={async ()=>{
+
+    fetch('http://localhost:8080/notification-service/health',{
+    method:"GET",
+    credentials:"include"
+
+    })
+    .then(res=>res.json())
+    .then(res=>console.log(res));
+}}>
+    notification
+</button>
+
+            
             <button
             onClick={async()=>{
                 stompClient2.send(
