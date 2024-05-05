@@ -211,7 +211,7 @@ function Navbar({account, fetchAccount, notificationsArr, setNotificationsArr, r
                                             className="object-cover w-full h-full" alt="avatar"/>
                                     </div>
 
-                                    <h3 className="px-3 py-2 mx-1 mt-2 text-gray-700 transition-colors duration-300 transform rounded-md lg:mt-0 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">{account?.userName}</h3>
+                                    <h3 className="px-3 py-2 mx-1 mt-2 text-gray-700 transition-colors duration-300 transform rounded-md lg:mt-0 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={()=>navigate("/")}>{account?.userName}</h3>
                                 </button>
 
                                 <div className="hs-dropdown relative inline-block [--placement:bottom]">
