@@ -1448,7 +1448,6 @@ function Post({
                         return (
                             <Comment key={`comment-${comment.id}-${id}`} propComment={comment}
                                      setCommentsArr={setCommentsArr} fetchAccount={fetchAccount}
-                                     containerClient={containerClient}
                                      showDelete={Boolean(account?.id === post.accountId || account?.id === comment.accountId)}/>
                         );
                     })
